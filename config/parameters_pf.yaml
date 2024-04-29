@@ -1,0 +1,32 @@
+start_pose_center_x: 16.0  # meters
+start_pose_center_y: 99.2  # meters
+particle_density: 200  # particles / m^2
+#start_width: 6.0  # meters
+start_width: 4.0  # meters
+start_height: 20.0  # meters
+#start_height: 22.0  # meters
+start_rotation: -32.0  # degrees
+start_orientation_center: 58.0  # degrees
+start_orientation_range: 10.0  # degrees
+spawn_particles_in_both_directions: true
+
+#x_offset: 0.8
+#y_offset: -0.55
+x_offset: 0.0
+y_offset: 0.0
+
+bin_angle: 10
+bin_size: 1.0
+delta: 0.05
+range_sd: 0.5
+bearing_sd: 0.3
+epsilon: 0.010
+r_angle: 20
+r_dist: 0.6
+width_sd: 0.025
+include_width: true
+
+max_num_particles: 2000000
+min_num_particles: 100
+
+stop_when_converged: true

@@ -1,4 +1,5 @@
 from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QHBoxLayout
 
 class PlaybackMode:
     def __init__(self, main_app_manager):
@@ -68,13 +69,19 @@ class PlaybackMode:
 
     def activate_mode(self):
         self.mode_active = True
-        self.main_app_manager.image_display.enable()
-        self.main_app_manager.image_number_label.enable()
-        self.main_app_manager.data_file_time_line.enable()
-        self.main_app_manager.data_file_controls.enable()
-        self.main_app_manager.image_browsing_controls.enable()
 
-        self.main_app_manager.reset_app()
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.mode_selector)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_browsing_controls)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_delay_slider)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_time_line)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
+
+        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
+
 
     def deactivate_mode(self):
         self.mode_active = False

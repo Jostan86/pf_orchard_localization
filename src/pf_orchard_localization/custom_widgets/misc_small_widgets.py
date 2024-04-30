@@ -49,10 +49,16 @@ class PfControlButtons(QWidget):
         self.start_stop_button = QPushButton("Start")
         self.start_stop_button.setToolTip("Start the particle filter")
 
+        self.continue_button = QPushButton("Continue")
+        self.continue_button.setToolTip("Continue the next step in the particle filter")
 
         self.top_layer_layout = QHBoxLayout()
         self.top_layer_layout.addWidget(self.reset_button)
         self.top_layer_layout.addWidget(self.adjust_pf_settings_button)
+
+        self.bottom_layer_layout = QHBoxLayout()
+        self.bottom_layer_layout.addWidget(self.start_stop_button)
+        self.bottom_layer_layout.addWidget(self.continue_button)
 
         self.num_particles_label = QLabel("0")
         self.num_particles_layout = QHBoxLayout()
@@ -62,7 +68,7 @@ class PfControlButtons(QWidget):
 
         self.control_layout = QVBoxLayout()
         self.control_layout.addLayout(self.top_layer_layout)
-        self.control_layout.addWidget(self.start_stop_button)
+        self.control_layout.addLayout(self.bottom_layer_layout)
         self.control_layout.addLayout(self.num_particles_layout)
 
         self.setLayout(self.control_layout)
@@ -99,9 +105,12 @@ class PfControlButtons(QWidget):
         if success:
             self.main_app_manager.print_message("Update Successful")
             self.main_app_manager.display_pf_settings()
-            self.main_app_manager.reset_app()
+            self.main_app_manager.reset_pf()
         else:
             self.main_app_manager.print_message("Update Failed")
+
+    def reset(self):
+        self.main_app_manager.reset_pf()
 
     def disable(self):
         self.reset_button.setDisabled(True)
@@ -126,7 +135,7 @@ class PfControlButtons(QWidget):
         self.start_stop_button.setToolTip("Continue the next step in the particle filter")
 
 class PfStartLocationControls(QWidget):
-    def __init__(self, main_app_manager, starting_settings: ParametersPf):
+    def __init__(self, main_app_manager):
         super().__init__()
 
         self.main_app_manager = main_app_manager
@@ -222,7 +231,7 @@ class PfStartLocationControls(QWidget):
         if shift_pressed:
             self.start_x_input.setText(str(round(x, 2)))
             self.start_y_input.setText(str(round(y, 2)))
-            self.main_app_manager.reset_app()
+            self.main_app_manager.reset_pf()
         else:
             self.main_app_manager.print_message("Shift click to set particle start position")
 
@@ -380,7 +389,7 @@ class ImageDisplay(QWidget):
 
 
 class PfModeSelector(QWidget):
-    def __init__(self, mode_options=("Scroll Images", "Continuous", "Manual")):
+    def __init__(self, mode_options=("Scroll Images", "PF - Recorded Data")):
         super().__init__()
 
         logging.debug(f"Starting Mode Selector with options {mode_options}")
@@ -434,8 +443,6 @@ class ImageBrowsingControls(QWidget):
     def emit_play_button_clicked(self):
         command = self.play_fwd_button.text()
         self.playButtonClicked.emit(command)
-
-
 
     def disable(self):
         self.previous_button.setDisabled(True)

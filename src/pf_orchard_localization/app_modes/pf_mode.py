@@ -1,4 +1,5 @@
 from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QHBoxLayout
 
 class PfMode:
     def __init__(self, main_app_manager):
@@ -10,15 +11,14 @@ class PfMode:
         self.timer = None
 
         self.main_app_manager.control_buttons.startStopButtonClicked.connect(self.start_stop_button_pushed)
+        self.main_app_manager.control_buttons.continue_button.clicked.connect(self.cont_button_clicked)
 
         self.mode_active = False
 
     def start_stop_button_pushed(self, command):
 
         # Check current text on button
-        if command == "Continue":
-            self.cont_button_clicked()
-        elif command == "Start":
+        if command == "Start":
             self.start_pf_continuous()
         elif command == "Stop":
             self.stop_pf_continuous()
@@ -36,7 +36,7 @@ class PfMode:
         current_msg = self.main_app_manager.data_manager.get_next_msg()
 
         if current_msg is None:
-            success = self.main_app_manager.load_next_data_file()
+            success = self.main_app_manager.data_file_controls.load_next_data_file()
             if not success:
                 self.stop_pf_continuous()
                 self.main_app_manager.print_message("Reached the end of the data files")
@@ -71,7 +71,7 @@ class PfMode:
             self.main_app_manager.plotter.update_position_estimate(best_guess)
 
         self.converged = self.main_app_manager.pf_engine.check_convergence()
-        if self.converged:
+        if self.converged and self.main_app_manager.parameters_pf.stop_when_converged:
             self.stop_pf_continuous()
 
         self.is_processing = False
@@ -116,15 +116,25 @@ class PfMode:
 
     def activate_mode(self):
         self.mode_active = True
-        self.main_app_manager.start_location_controls.enable()
-        self.main_app_manager.control_buttons.enable()
-        self.main_app_manager.image_display.enable()
-        self.main_app_manager.image_number_label.enable()
-        self.main_app_manager.data_file_time_line.enable()
-        self.main_app_manager.data_file_controls.enable()
 
-        self.main_app_manager.control_buttons.enable()
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.mode_selector)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.start_location_controls)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.control_buttons)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
+
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_delay_slider)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_time_line)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
+
+        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
+        self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
+
+        self.main_app_manager.reset_pf()
 
     def deactivate_mode(self):
         self.mode_active = False
         self.ensure_pf_stopped()
+

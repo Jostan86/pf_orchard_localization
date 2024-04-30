@@ -34,7 +34,7 @@ class PfAppBags(PfMainWindow):
         self.map_data = get_map_data(map_data_path=self.parameters_data.map_data_path)
         self.pf_engine = PFEngine(self.map_data)
 
-        self.init_ui()
+        self.init_widgets()
 
         self.current_msg = None
 
@@ -64,9 +64,7 @@ class PfAppBags(PfMainWindow):
 
         self.mode_changed()
 
-        self.reset_app()
-
-    def init_ui(self):
+    def init_widgets(self):
         # Set up the main window
         self.setWindowTitle("Orchard Localization App")
 
@@ -76,7 +74,7 @@ class PfAppBags(PfMainWindow):
 
         self.ui_layout = QVBoxLayout()
 
-        self.start_location_controls = PfStartLocationControls(self, self.parameters_pf)
+        self.start_location_controls = PfStartLocationControls(self)
         self.control_buttons = PfControlButtons(self)
         self.mode_selector = PfModeSelector()
         self.image_display = ImageDisplay(num_camera_feeds=1, scale_factor=1.0)
@@ -94,38 +92,20 @@ class PfAppBags(PfMainWindow):
             ["stop_when_converged_checkbox", "Stop When Converged", self.parameters_pf.stop_when_converged])
         self.checkboxes.init_checkboxes()
 
-        self.delay_and_time_line_layout = QHBoxLayout()
-        self.delay_and_time_line_layout.addWidget(self.data_file_time_line)
-        self.delay_and_time_line_layout.addWidget(self.image_delay_slider)
-
-        self.ui_layout.addWidget(self.start_location_controls)
-        self.ui_layout.addWidget(self.checkboxes)
-        self.ui_layout.addWidget(self.mode_selector)
-        self.ui_layout.addWidget(self.control_buttons)
-        self.ui_layout.addWidget(self.image_display)
-        self.ui_layout.addWidget(self.image_number_label)
-        self.ui_layout.addWidget(self.image_browsing_controls)
-
-        self.ui_layout.addLayout(self.delay_and_time_line_layout)
-        self.ui_layout.addWidget(self.data_file_controls)
-        self.ui_layout.addWidget(self.console)
-
         self.plotter = TreatingPFPlotter(self.map_data)
-
-        self.main_layout.addLayout(self.ui_layout)
-        self.main_layout.addWidget(self.plotter)
 
         # Create central widget
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
         central_widget.setLayout(self.main_layout)
 
-        self.toggle_widget_list = [self.start_location_controls, self.control_buttons,
-                                   self.image_display, self.image_number_label, self.image_browsing_controls,
-                                   self.data_file_time_line, self.data_file_controls]
+        self.widget_list = [self.start_location_controls, self.checkboxes, self.mode_selector, self.control_buttons,
+                            self.image_display, self.image_number_label, self.image_browsing_controls,
+                            self.data_file_time_line, self.image_delay_slider, self.data_file_controls, self.console,
+                            self.plotter, self.ui_layout]
 
     def connect_app_to_ui(self):
-        self.control_buttons.reset_button.clicked.connect(self.reset_app)
+        self.control_buttons.reset_button.clicked.connect(self.reset_pf)
 
         self.plotter.plot_widget.clicked.connect(self.start_location_controls.set_start_location_from_plot_click)
 
@@ -137,20 +117,17 @@ class PfAppBags(PfMainWindow):
 
         self.data_file_time_line.data_file_time_line.returnPressed.connect(self.data_file_time_line_edited)
 
-    def enable_all_widgets(self):
-        for widget in self.toggle_widget_list:
-            widget.enable()
-
     def disable_all_widgets(self):
-        for widget in self.toggle_widget_list:
-            widget.disable()
+        for widget in self.widget_list:
+            widget.setParent(None)
 
-    def reset_app(self):
+    def reset_pf(self):
         self.start_location_controls.get_parameters()
 
         self.pf_engine.reset_pf(self.parameters_pf)
 
         self.reset_gui()
+
     def reset_gui(self):
         self.control_buttons.num_particles_label.setText(str(self.parameters_pf.num_particles))
         self.plotter.update_particles(self.pf_engine.downsample_particles())
@@ -172,12 +149,8 @@ class PfAppBags(PfMainWindow):
 
         if self.mode_selector.mode == "Scroll Images":
             self.playback_mode.activate_mode()
-        elif self.mode_selector.mode == "Manual":
+        elif self.mode_selector.mode == "PF - Recorded Data":
             self.pf_mode.activate_mode()
-            self.control_buttons.set_continue()
-        elif self.mode_selector.mode == "Continuous":
-            self.pf_mode.activate_mode()
-            self.control_buttons.set_start()
 
     def data_file_time_line_edited(self):
         time_stamp = self.data_file_time_line.data_file_time_line.text()

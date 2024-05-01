@@ -1,5 +1,5 @@
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QHBoxLayout
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout
 
 class PfMode:
     def __init__(self, main_app_manager):
@@ -11,7 +11,7 @@ class PfMode:
         self.timer = None
 
         self.main_app_manager.control_buttons.startStopButtonClicked.connect(self.start_stop_button_pushed)
-        self.main_app_manager.control_buttons.continue_button.clicked.connect(self.cont_button_clicked)
+        self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.cont_button_clicked)
 
         self.mode_active = False
 
@@ -36,10 +36,10 @@ class PfMode:
         current_msg = self.main_app_manager.data_manager.get_next_msg()
 
         if current_msg is None:
-            success = self.main_app_manager.data_file_controls.load_next_data_file()
+            success = self.main_app_manager.load_next_data_file(load_first_image=False)
             if not success:
                 self.stop_pf_continuous()
-                self.main_app_manager.print_message("Reached the end of the data files")
+                self.main_app_manager.print_message("Failed to load next data file. Stopping particle filter.")
                 return
 
             current_msg = self.main_app_manager.data_manager.get_next_msg()
@@ -52,23 +52,10 @@ class PfMode:
 
         elif current_msg['topic'] == 'image':
 
+            self.get_data_from_image_msg(current_msg)
 
-            # Get trunk data from trunk connection
-            positions, widths, class_estimates = self.main_app_manager.trunk_data_connection.get_trunk_data(current_msg)
-
-            if positions is None:
-                self.is_processing = False
+            if not self.is_processing:
                 return
-
-            self.main_app_manager.image_number_label.set_img_number_label(self.main_app_manager.data_manager.current_img_position,
-                                                              self.main_app_manager.data_manager.num_img_msgs)
-
-            tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
-            self.main_app_manager.pf_engine.scan_update(tree_data)
-
-            best_guess = self.main_app_manager.pf_engine.best_particle
-            self.main_app_manager.plotter.update_particles(self.main_app_manager.pf_engine.downsample_particles())
-            self.main_app_manager.plotter.update_position_estimate(best_guess)
 
         self.converged = self.main_app_manager.pf_engine.check_convergence()
         if self.converged and self.main_app_manager.parameters_pf.stop_when_converged:
@@ -76,17 +63,42 @@ class PfMode:
 
         self.is_processing = False
 
+    def get_data_from_image_msg(self, current_msg):
+
+        positions, widths, class_estimates, seg_img = self.main_app_manager.trunk_data_connection.get_trunk_data(
+                                                                current_msg, return_seg_img=True)
+
+        if positions is None:
+            if self.main_app_manager.cached_data_creator.cache_data_enabled:
+                self.main_app_manager.cached_data_creator.cache_tree_data(None, None, None, None,
+                                                                          current_msg['timestamp'])
+            self.is_processing = False
+            return
+
+        self.main_app_manager.image_number_label.set_img_number_label(
+            self.main_app_manager.data_manager.current_img_position,
+            self.main_app_manager.data_manager.num_img_msgs)
+
+        tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
+        self.main_app_manager.pf_engine.scan_update(tree_data)
+
+        best_guess = self.main_app_manager.pf_engine.best_particle
+        self.main_app_manager.plotter.update_particles(self.main_app_manager.pf_engine.downsample_particles())
+        self.main_app_manager.plotter.update_position_estimate(best_guess)
+
+        if self.main_app_manager.cached_data_creator.cache_data_enabled:
+            self.main_app_manager.cached_data_creator.cache_tree_data(positions, widths, class_estimates, best_guess,
+                                                                      current_msg['timestamp'])
+            self.main_app_manager.cached_data_creator.save_image(seg_img, current_msg['timestamp'])
+
     def get_odom_data(self, current_msg):
         odom_data = current_msg['data']
+        x_odom = odom_data.twist.twist.linear.x
+        theta_odom = odom_data.twist.twist.angular.z
+        time_stamp_odom = odom_data.header.stamp.to_sec()
 
-        if self.main_app_manager.using_cached_data:
-            x_odom = odom_data['x_odom']
-            theta_odom = odom_data['theta_odom']
-            time_stamp_odom = current_msg['timestamp']
-        else:
-            x_odom = odom_data.twist.twist.linear.x
-            theta_odom = odom_data.twist.twist.angular.z
-            time_stamp_odom = odom_data.header.stamp.to_sec()
+        if self.main_app_manager.cached_data_creator.cache_data_enabled:
+            self.main_app_manager.cached_data_creator.cache_odom_data(x_odom, theta_odom, time_stamp_odom)
 
         return x_odom, theta_odom, time_stamp_odom
 
@@ -117,15 +129,76 @@ class PfMode:
     def activate_mode(self):
         self.mode_active = True
 
+        img_delay_time_line_layout = QHBoxLayout()
+        img_delay_time_line_layout.addWidget(self.main_app_manager.data_file_time_line)
+        img_delay_time_line_layout.addWidget(self.main_app_manager.image_delay_slider)
+
         self.main_app_manager.ui_layout.addWidget(self.main_app_manager.mode_selector)
         self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
         self.main_app_manager.ui_layout.addWidget(self.main_app_manager.start_location_controls)
         self.main_app_manager.ui_layout.addWidget(self.main_app_manager.control_buttons)
         self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
         self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
+        self.main_app_manager.ui_layout.addLayout(img_delay_time_line_layout)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.cached_data_creator)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
 
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_delay_slider)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_time_line)
+        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
+        self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
+
+        self.main_app_manager.reset_pf()
+
+    def deactivate_mode(self):
+        self.mode_active = False
+        self.main_app_manager.cached_data_creator.enable_checkbox.setChecked(False)
+        self.ensure_pf_stopped()
+
+class PfModeCached(PfMode):
+    def __init__(self, main_app_manager):
+        super().__init__(main_app_manager)
+
+    def get_data_from_image_msg(self, current_msg):
+
+        positions, widths, class_estimates = self.main_app_manager.trunk_data_connection.get_trunk_data(current_msg)
+
+        if positions is None:
+            self.is_processing = False
+            return
+
+        self.main_app_manager.image_number_label.set_img_number_label(
+            self.main_app_manager.data_manager.current_img_position,
+            self.main_app_manager.data_manager.num_img_msgs)
+
+        tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
+        self.main_app_manager.pf_engine.scan_update(tree_data)
+
+        best_guess = self.main_app_manager.pf_engine.best_particle
+        self.main_app_manager.plotter.update_particles(self.main_app_manager.pf_engine.downsample_particles())
+        self.main_app_manager.plotter.update_position_estimate(best_guess)
+
+    def get_odom_data(self, current_msg):
+        odom_data = current_msg['data']
+        x_odom = odom_data['x_odom']
+        theta_odom = odom_data['theta_odom']
+        time_stamp_odom = current_msg['timestamp']
+
+        return x_odom, theta_odom, time_stamp_odom
+
+    def activate_mode(self):
+        self.mode_active = True
+
+        img_delay_time_line_layout = QHBoxLayout()
+        img_delay_time_line_layout.addWidget(self.main_app_manager.data_file_time_line)
+        img_delay_time_line_layout.addWidget(self.main_app_manager.image_delay_slider)
+
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.mode_selector)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.start_location_controls)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.control_buttons)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
+        self.main_app_manager.ui_layout.addLayout(img_delay_time_line_layout)
         self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
         self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
 
@@ -137,4 +210,3 @@ class PfMode:
     def deactivate_mode(self):
         self.mode_active = False
         self.ensure_pf_stopped()
-

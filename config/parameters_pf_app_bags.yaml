@@ -6,6 +6,7 @@ image_save_dir: /home/jostan/Documents/save_test1/
 initial_data_time: 0  # seconds into the bag file
 initial_data_file_index: 0  # index of the bag file
 
+image_display_scale: 1.0
 
 # ----------------------
 # Bi-axe orchard

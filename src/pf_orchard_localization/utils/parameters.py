@@ -88,6 +88,8 @@ class ParametersBagData(Parameters):
     map_data_path: str = None
     image_save_dir: str = None
 
+    image_display_scale: float = None
+
 # @dataclass
 # class ParametersImageSelect(ParametersBag):
 

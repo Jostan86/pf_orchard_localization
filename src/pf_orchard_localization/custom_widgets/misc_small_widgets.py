@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import (QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QApplication, QLineEdit, QCheckBox,
-                             QPlainTextEdit, QMainWindow, QComboBox, QFileDialog, QInputDialog, QDialog, QSlider)
+                             QPlainTextEdit, QMainWindow, QComboBox, QFileDialog, QInputDialog, QDialog, QSlider,
+                             QListWidget, QMessageBox)
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal
 import math
@@ -9,6 +10,8 @@ from ..utils.parameters import ParametersPf
 from . import PfSettingsDialog
 import time
 import logging
+import json
+import os
 
 class PfMainWindow(QMainWindow):
     def __init__(self):
@@ -49,8 +52,8 @@ class PfControlButtons(QWidget):
         self.start_stop_button = QPushButton("Start")
         self.start_stop_button.setToolTip("Start the particle filter")
 
-        self.continue_button = QPushButton("Continue")
-        self.continue_button.setToolTip("Continue the next step in the particle filter")
+        self.single_step_button = QPushButton("Take Step")
+        self.single_step_button.setToolTip("Continue the next step in the particle filter")
 
         self.top_layer_layout = QHBoxLayout()
         self.top_layer_layout.addWidget(self.reset_button)
@@ -58,7 +61,7 @@ class PfControlButtons(QWidget):
 
         self.bottom_layer_layout = QHBoxLayout()
         self.bottom_layer_layout.addWidget(self.start_stop_button)
-        self.bottom_layer_layout.addWidget(self.continue_button)
+        self.bottom_layer_layout.addWidget(self.single_step_button)
 
         self.num_particles_label = QLabel("0")
         self.num_particles_layout = QHBoxLayout()
@@ -130,10 +133,6 @@ class PfControlButtons(QWidget):
         self.start_stop_button.setText("Stop")
         self.start_stop_button.setToolTip("Stop the particle filter")
 
-    def set_continue(self):
-        self.start_stop_button.setText("Continue")
-        self.start_stop_button.setToolTip("Continue the next step in the particle filter")
-
 class PfStartLocationControls(QWidget):
     def __init__(self, main_app_manager):
         super().__init__()
@@ -179,7 +178,7 @@ class PfStartLocationControls(QWidget):
         self.start_height_input.setToolTip("Height of the starting block")
 
         self.start_width_height_layout = QHBoxLayout()
-        self.start_width_height_layout.addWidget(QLabel("Start Pose Width/Height:"))
+        self.start_width_height_layout.addWidget(QLabel("Start Pose Size:"))
         self.start_width_height_layout.addWidget(QLabel("Width:"))
         self.start_width_height_layout.addWidget(self.start_width_input)
         self.start_width_height_layout.addWidget(QLabel("Height:"))
@@ -389,7 +388,7 @@ class ImageDisplay(QWidget):
 
 
 class PfModeSelector(QWidget):
-    def __init__(self, mode_options=("Scroll Images", "PF - Recorded Data")):
+    def __init__(self, mode_options=("PF - Recorded Data", "Scroll Images", )):
         super().__init__()
 
         logging.debug(f"Starting Mode Selector with options {mode_options}")
@@ -426,23 +425,52 @@ class ImageBrowsingControls(QWidget):
         super().__init__()
 
         self.previous_button = QPushButton("Previous")
+        self.previous_button.setToolTip("Go to the previous image")
         self.next_button = QPushButton("Next")
+        self.next_button.setToolTip("Go to the next image")
         self.play_fwd_button = QPushButton("Play")
+        self.play_fwd_button.setToolTip("Play the images forward")
+
         self.save_button = QPushButton("Save Image")
+        self.save_button.setToolTip("Save the current image")
+        self.save_button.setMinimumWidth(200)
+        self.save_location_input = QLineEdit()
+        self.save_location_input.setToolTip("Location to save the images to, click change to change this location")
+        self.save_location_input.setPlaceholderText("Save Location")
+        self.save_location_change_button = QPushButton("Change")
+        self.save_location_change_button.setToolTip("Change the location to save the images to")
+        self.save_location_change_button.setMinimumWidth(150)
 
         self.img_browsing_buttons_layout = QHBoxLayout()
         self.img_browsing_buttons_layout.addWidget(self.previous_button)
         self.img_browsing_buttons_layout.addWidget(self.next_button)
         self.img_browsing_buttons_layout.addWidget(self.play_fwd_button)
-        self.img_browsing_buttons_layout.addWidget(self.save_button)
 
-        self.setLayout(self.img_browsing_buttons_layout)
+        self.save_settings_layout = QHBoxLayout()
+        self.save_settings_layout.addWidget(self.save_button)
+        self.save_settings_layout.addWidget(self.save_location_input)
+        self.save_settings_layout.addWidget(self.save_location_change_button)
+
+        self.overall_layout = QVBoxLayout()
+        self.overall_layout.addLayout(self.img_browsing_buttons_layout)
+        self.overall_layout.addLayout(self.save_settings_layout)
+
+        self.setLayout(self.overall_layout)
 
         self.play_fwd_button.clicked.connect(self.emit_play_button_clicked)
+        self.save_location_change_button.clicked.connect(self.change_save_location)
 
     def emit_play_button_clicked(self):
         command = self.play_fwd_button.text()
         self.playButtonClicked.emit(command)
+
+    def change_save_location(self):
+        save_location = QFileDialog.getExistingDirectory(self, "Select Save Location") + "/"
+        self.save_location_input.setText(save_location)
+
+    @property
+    def save_location(self):
+        return self.save_location_input.text()
 
     def disable(self):
         self.previous_button.setDisabled(True)
@@ -511,14 +539,16 @@ class ImageDelaySlider(QWidget):
 
         label = QLabel("Delay Between Images:")
 
+        start_value_ms = 50
+
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setMinimum(0)
-        self.slider.setMaximum(1000)
-        self.slider.setValue(500)
+        self.slider.setMaximum(500)
+        self.slider.setValue(start_value_ms)
         self.slider.setTickInterval(10)
         self.slider.setTickPosition(QSlider.NoTicks)
 
-        self.value_label = QLabel("500ms")
+        self.value_label = QLabel(str(start_value_ms) + " ms")
 
         label.setFixedWidth(175)
         self.slider.setFixedWidth(200)
@@ -544,3 +574,192 @@ class ImageDelaySlider(QWidget):
 
     def enable(self):
         self.slider.setDisabled(False)
+
+class CachedDataCreator(QWidget):
+    def __init__(self, main_app_manager):
+        super().__init__()
+
+        self.main_app_manager = main_app_manager
+
+        self.cache_data_enabled = False
+        self.cache = {}
+
+        button_width = 140
+
+        self.enable_checkbox = QCheckBox("Cache Data")
+        self.enable_checkbox.setToolTip("Enable caching of data")
+        self.enable_checkbox.setChecked(self.cache_data_enabled)
+        self.enable_checkbox.setMinimumWidth(180)
+
+        self.save_label = QLabel("Save Directory:")
+        self.save_label.setToolTip("Directory to save the cached data in")
+        self.save_label.setMinimumWidth(105)
+
+        self.save_directory_input = QLineEdit()
+        self.save_directory_input.setToolTip("Directory to save the cached data in")
+        self.save_directory_input.setPlaceholderText("Save Directory")
+        self.save_directory_input.setReadOnly(True)
+
+        self.change_save_directory_button = QPushButton("Change")
+        self.change_save_directory_button.setToolTip("Change the directory to save the cached data in")
+        self.change_save_directory_button.setMinimumWidth(button_width)
+
+        self.save_images_checkbox = QCheckBox("Save Images")
+        self.save_images_checkbox.setToolTip("Save segmented image also for display on playback")
+        self.save_images_checkbox.setChecked(True)
+        self.save_images_checkbox.setMinimumWidth(button_width)
+
+        self.cache_size_label = QLabel("Cache Size: 0 messages")
+        self.cache_size_label.setToolTip("Number of messages currently in the cache")
+        self.cache_size_label.setMinimumWidth(180)
+
+        self.file_name_label = QLabel("File Name:")
+        self.file_name_label.setToolTip("Name of the file to save the cached data as")
+        self.file_name_label.setMinimumWidth(105)
+
+        self.file_name_input = QLineEdit()
+        self.file_name_input.setToolTip("Name of the file to save the cached data as")
+        self.start_text = "File Name (e.g. run1_data)"
+        self.file_name_input.setPlaceholderText(self.start_text)
+
+        self.save_button = QPushButton("Save Cache")
+        self.save_button.setToolTip("Save the cached data to the specified file")
+        self.save_button.setMinimumWidth(button_width)
+
+        self.reset_cache_button = QPushButton("Reset Cache")
+        self.reset_cache_button.setToolTip("Reset the cache")
+        self.reset_cache_button.setMinimumWidth(button_width)
+
+
+        self.main_layout = QVBoxLayout()
+        self.top_layout = QHBoxLayout()
+        self.bottom_layout = QHBoxLayout()
+
+        self.top_layout.addWidget(self.enable_checkbox)
+        self.top_layout.addWidget(self.save_label)
+        self.top_layout.addWidget(self.save_directory_input)
+        self.top_layout.addWidget(self.change_save_directory_button)
+        self.top_layout.addWidget(self.save_images_checkbox)
+
+        self.bottom_layout.addWidget(self.cache_size_label)
+        self.bottom_layout.addWidget(self.file_name_label)
+        self.bottom_layout.addWidget(self.file_name_input)
+        self.bottom_layout.addWidget(self.save_button)
+        self.bottom_layout.addWidget(self.reset_cache_button)
+
+        self.main_layout.addLayout(self.top_layout)
+        self.main_layout.addLayout(self.bottom_layout)
+
+        self.setLayout(self.main_layout)
+
+        self.enable_checkbox.stateChanged.connect(self.cache_data_checkbox_changed)
+        self.change_save_directory_button.clicked.connect(self.change_save_directory)
+        self.save_button.clicked.connect(self.save_cache)
+        self.reset_cache_button.clicked.connect(self.reset_cache)
+
+        self.cache_data_checkbox_changed()
+
+    def change_save_directory(self):
+        save_location = QFileDialog.getExistingDirectory(self, "Select Save Location") + "/"
+        self.save_directory_input.setText(save_location)
+        # check for "images" folder, if it doesn't exist, create it
+
+    def reset_cache(self):
+        self.cache = {}
+        self.cache_size_label.setText("Cache Size: 0 messages")
+
+    def get_timestamp_str(self, time_stamp):
+        return str(time_stamp*1000).split(".")[0]
+    def cache_odom_data(self, x_odom, theta_odom, time_stamp_odom):
+        self.cache[self.get_timestamp_str(time_stamp_odom)] = {"x_odom": x_odom, "theta_odom": theta_odom, "time_stamp": time_stamp_odom}
+        self.cache_size_label.setText("Cache Size: " + str(len(self.cache)) + " messages")
+
+    def cache_tree_data(self, positions, widths, class_estimates, location_estimate, time_stamp):
+        if positions is None:
+            self.cache[self.get_timestamp_str(time_stamp)] = None
+            return
+        tree_data = {"positions": positions.tolist(), "widths": widths.tolist(), "classes": class_estimates.tolist()}
+        location_estimate = {"x": location_estimate[0], "y": location_estimate[1], "theta": location_estimate[2]}
+        self.cache[self.get_timestamp_str(time_stamp)] = {"tree_data": tree_data, "location_estimate": location_estimate}
+
+    def save_cache(self):
+        if len(self.cache) == 0:
+            self.main_app_manager.print_message("No data to save")
+            return
+
+        if not os.path.exists(self.save_directory_input.text()):
+            self.main_app_manager.print_message("Save directory does not exist")
+            return
+
+        if self.file_name_input.text() == "" or self.file_name_input.text() == self.start_text:
+            self.main_app_manager.print_message("Please enter a file name")
+            return
+
+        save_location = self.save_directory_input.text() + self.file_name_input.text() + ".json"
+
+        # check if file already exists, if so, have popup to ask if they want to overwrite
+        if os.path.exists(save_location):
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setText("File already exists")
+            msg_box.setInformativeText("Do you want to overwrite the file?")
+            msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            msg_box.setDefaultButton(QMessageBox.No)
+            ret = msg_box.exec_()
+            if ret == QMessageBox.No:
+                return
+
+        with open(save_location, 'w') as f:
+            json.dump(self.cache, f)
+
+        self.main_app_manager.print_message("Cache saved to: " + save_location)
+
+    def save_image(self, img, time_stamp):
+        if self.save_images_checkbox.isChecked() == False:
+            self.main_app_manager.print_message("Images not being saved")
+            return
+
+        save_directory = self.save_directory_input.text()
+
+        if not os.path.exists(save_directory):
+            self.main_app_manager.print_message("Save directory does not exist")
+            return
+
+        save_directory = save_directory + "images/"
+
+        if not os.path.exists(save_directory):
+            os.makedirs(save_directory)
+
+        save_location = save_directory + self.get_timestamp_str(time_stamp) + ".png"
+
+        cv2.imwrite(save_location, img)
+
+    def cache_data_checkbox_changed(self):
+        if self.enable_checkbox.isChecked():
+            self.cache_data_enabled = True
+            self.set_input_disabled(False)
+        else:
+            self.cache_data_enabled = False
+            self.reset_cache()
+            self.set_input_disabled(True)
+
+    def set_input_disabled(self, disabled):
+        self.save_images_checkbox.setDisabled(disabled)
+        self.save_directory_input.setDisabled(disabled)
+        self.change_save_directory_button.setDisabled(disabled)
+        self.file_name_input.setDisabled(disabled)
+        self.save_button.setDisabled(disabled)
+        self.reset_cache_button.setDisabled(disabled)
+
+    def enable (self):
+        self.enable_checkbox.setDisabled(False)
+        self.set_input_disabled(False)
+
+    def disable(self):
+        self.enable_checkbox.setDisabled(True)
+        self.set_input_disabled(True)
+
+
+
+
+

@@ -11,7 +11,9 @@ def import_trunk_analyzer(width_estimation_config_file_path):
 class TrunkDataConnection:
     def __init__(self,
                  width_estimation_config_file_path: str = None,
-                 seg_image_display_func: Callable[[Optional[np.ndarray], int], None] = None,
+                 seg_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
+                 pre_filtered_segmentation_display_func: Callable[[Optional[np.ndarray]], None] = None,
+                 original_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
                  message_printer: Callable[[List[str]], None] = None):
@@ -20,6 +22,8 @@ class TrunkDataConnection:
 
         self.class_mapping = class_mapping
         self.seg_image_display_func = seg_image_display_func
+        self.pre_filtered_segmentation_display_func = pre_filtered_segmentation_display_func
+        self.original_image_display_func = original_image_display_func
         self.offset = offset
         self.message_printer = message_printer
 
@@ -27,24 +31,32 @@ class TrunkDataConnection:
         if width_estimation_config_file_path is not None:
             self.trunk_analyzer, self.trunk_segmenter = import_trunk_analyzer(width_estimation_config_file_path)
 
-    def get_trunk_data(self, current_msg):
-        # start_time = time.time()
+    def get_trunk_data(self, current_msg, return_seg_img=False):
         results_dict, results = self.trunk_segmenter.get_results(current_msg['rgb_image'])
+
+        if self.pre_filtered_segmentation_display_func is not None:
+            seg_img_og = results.plot()
+        else:
+            seg_img_og = None
 
         positions, widths, class_estimates, seg_img = self.get_results(current_msg, results_dict, results)
 
-        # print(f"Time to get trunk data: {time.time() - start_time}")
+        if seg_img is None:
+            seg_img = current_msg['rgb_image']
 
-        if positions is not None:
-            positions[:, 0] += self.offset[0]
-            positions[:, 1] += self.offset[1]
+        if self.original_image_display_func is not None:
+            self.original_image_display_func(current_msg['rgb_image'])
 
-        if seg_img is not None and self.seg_image_display_func is not None:
-            self.seg_image_display_func(seg_img, 0)
-        elif self.seg_image_display_func is not None:
-            self.seg_image_display_func(current_msg['rgb_image'], 0)
+        if self.pre_filtered_segmentation_display_func is not None:
+            self.pre_filtered_segmentation_display_func(seg_img_og)
 
-        return positions, widths, class_estimates
+        if self.seg_image_display_func is not None:
+            self.seg_image_display_func(seg_img)
+
+        if not return_seg_img:
+            return positions, widths, class_estimates
+        else:
+            return positions, widths, class_estimates, seg_img
 
     def get_results(self, current_msg, results_dict, results):
 
@@ -84,42 +96,11 @@ class TrunkDataConnection:
         if self.message_printer is not None:
             self.message_printer(messages)
 
-class TrunkDataConnectionImageSelect(TrunkDataConnection):
-    def __init__(self,
-                 width_estimation_config_file_path: str = None,
-                 seg_image_display_func: Callable[[Optional[np.ndarray], int], None] = None,
-                 og_seg_image_display_func: Callable[[Optional[np.ndarray], int], None] = None,
-                 class_mapping=(1, 2, 0),
-                 offset=(0, 0),
-                 message_printer: Callable[[List[str]], None] = None):
-        super().__init__(width_estimation_config_file_path, seg_image_display_func, class_mapping, offset, message_printer)
-
-        self.og_seg_image_display_func = og_seg_image_display_func
-
-    def get_trunk_data(self, current_msg):
-        results_dict, results = self.trunk_segmenter.get_results(current_msg['rgb_image'])
-
-        if self.og_seg_image_display_func is not None:
-            seg_img_og = results.plot()
-        else:
-            seg_img_og = None
-
-        positions, widths, class_estimates, seg_img = self.get_results(current_msg, results_dict, results)
-
-        if seg_img_og is not None:
-            self.og_seg_image_display_func(seg_img_og, 0)
-        else:
-            self.og_seg_image_display_func(current_msg['rgb_image'], 0)
-
-        if seg_img is not None:
-            self.seg_image_display_func(seg_img, 1)
-        else:
-            self.seg_image_display_func(None, 1)
 
 class TrunkDataConnectionCachedData(TrunkDataConnection):
     def __init__(self,
                  cached_img_directory,
-                 seg_image_display_func: Callable[[Optional[np.ndarray], int], None],
+                 seg_image_display_func: Callable[[Optional[np.ndarray]], None],
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
                  message_printer: Callable[[List[str]], None] = None,
@@ -152,7 +133,7 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
 
 
         if seg_img is not None and self.seg_image_display_func is not None:
-            self.seg_image_display_func(seg_img, 0)
+            self.seg_image_display_func(seg_img)
 
         if class_estimates is not None:
             class_estimates = self.remap_classes(class_estimates)

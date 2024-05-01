@@ -10,6 +10,8 @@ class CachedDataLoader(BaseDataLoader):
         self.open_file(file_path)
 
     def open_file(self, file_path):
+        self.current_data_file_path = file_path
+
         t_start = None
 
         print("Opening file: " + file_path)

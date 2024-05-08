@@ -19,7 +19,7 @@ initial_data_file_index: 0  # index of the bag file
 pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
 map_data_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/orchard_map_maker/scripts/map_making1/map_data_main.json
 
-data_file_dir: /media/jostan/portabits/pf_saved_data2/
-cached_image_dir: /media/jostan/portabits/pf_saved_data2/images/
+data_file_dir: /media/jostan/portabits/pf_saved_data/pf_data/
+cached_image_dir: /media/jostan/portabits/pf_saved_data/images/
 
 

@@ -5,27 +5,38 @@ from dataclasses import fields
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QWidget
 from ..custom_widgets import (PfMainWindow, PfControlButtons, PfStartLocationControls, PfCheckBoxes,
                               Console, ImageDisplay, PfModeSelector, ImageBrowsingControls, TreatingPFPlotter,
-                              DataFileControls, DataFileTimeLine, ImageNumberLabel, ImageDelaySlider, CachedDataCreator)
-from ..utils.parameters import ParametersPf, ParametersBagData, ParametersCachedData
+                              DataFileControls, DataFileTimeLine, ImageNumberLabel, ImageDelaySlider, CachedDataCreator,
+                              PfChangeParametersButton, PfTestControls, PfQueueSizeLabel, RosConnectButton)
+from ..utils.parameters import ParametersPf, ParametersBagData, ParametersCachedData, ParametersLiveData
 from ..pf_engine import PFEngine
 from ..utils.get_map_data import get_map_data
 import logging
 from ..trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCachedData
-from ..app_modes import PfMode, PfModeCached, PlaybackMode
+from ..app_modes import PfMode, PfModeCached, PfModeCachedTests, PlaybackMode, PfLiveMode
 from ..recorded_data_loaders import BagDataLoader, CachedDataLoader
 import os
 from functools import partial
-
+import time
 # Separate the trunk analyzer import to a separate function to avoid import if not needed
 
 
 class PfAppBags(PfMainWindow):
-    def __init__(self, config_file_path, use_cached_data=False, logging_level=logging.DEBUG):
+    def __init__(self, config_file_path, use_cached_data=False, use_live_data=False, logging_level=logging.DEBUG):
         super().__init__()
 
-        self.using_cached_data = use_cached_data
+        if use_live_data:
+            self.using_cached_data = False
+            self.running_live_mode = True
+        else:
+            self.using_cached_data = use_cached_data
+            self.running_live_mode = False
 
-        self.parameters_data = ParametersCachedData() if self.using_cached_data else ParametersBagData()
+        if self.using_cached_data:
+            self.parameters_data = ParametersCachedData()
+        elif self.running_live_mode:
+            self.parameters_data = ParametersLiveData()
+        else:
+            self.parameters_data = ParametersBagData()
 
         self.parameters_data.load_from_yaml(config_file_path)
         self.parameters_pf = ParametersPf()
@@ -51,16 +62,35 @@ class PfAppBags(PfMainWindow):
             self.data_file_time_line.set_time_line(float(self.parameters_data.initial_data_time))
             self.data_manager.set_time_stamp(float(self.parameters_data.initial_data_time))
 
-        self.pf_mode = PfModeCached(self) if self.using_cached_data else PfMode(self)
-        self.playback_mode = PlaybackMode(self)
+        self.modes = []
 
-        self.modes = [self.pf_mode, self.playback_mode]
+        if self.using_cached_data:
+            self.pf_tests_mode = PfModeCachedTests(self)
+            self.modes.append(self.pf_tests_mode)
+            self.pf_mode = PfModeCached(self)
+            self.modes.append(self.pf_mode)
+            self.playback_mode = PlaybackMode(self)
+            self.modes.append(self.playback_mode)
+
+        elif self.running_live_mode:
+            self.pf_live_mode = PfLiveMode(self)
+            self.modes.append(self.pf_live_mode)
+
+        else:
+            self.pf_mode = PfMode(self)
+            self.modes.append(self.pf_mode)
+            self.playback_mode = PlaybackMode(self)
+            self.modes.append(self.playback_mode)
+
+        self.mode_selector.set_modes(self.modes)
 
         self.mode_changed()
 
+        self.pf_test_controls.load_test("/media/jostan/portabits/test_starts2.csv")
+
     def init_widgets(self):
         # Set up the main window
-        self.setWindowTitle("Orchard Localization App")
+        self.setWindowTitle("Orchard Particle Filter Localization App")
 
         self.init_window_display_settings()
 
@@ -70,6 +100,7 @@ class PfAppBags(PfMainWindow):
 
         self.start_location_controls = PfStartLocationControls(self)
         self.control_buttons = PfControlButtons(self)
+        self.change_parameters_button = PfChangeParametersButton(self)
         self.mode_selector = PfModeSelector()
         self.image_display = ImageDisplay(num_camera_feeds=1, scale_factor=1.0)
         self.image_browsing_controls = ImageBrowsingControls()
@@ -79,6 +110,9 @@ class PfAppBags(PfMainWindow):
         self.image_number_label = ImageNumberLabel()
         self.image_delay_slider = ImageDelaySlider()
         self.cached_data_creator = CachedDataCreator(self)
+        self.pf_test_controls = PfTestControls(self)
+        self.queue_size_label = PfQueueSizeLabel()
+        self.ros_connect_button = RosConnectButton()
 
         self.checkboxes = PfCheckBoxes()
         self.checkboxes.all_checkbox_info.append(
@@ -100,7 +134,8 @@ class PfAppBags(PfMainWindow):
 
         # Note that ui_layout always needs to be at the end of this list or bugs will occur, or really, it needs to have
         # top level widgets added to it last
-        self.widget_list = [self.start_location_controls, self.checkboxes, self.mode_selector, self.control_buttons,
+        self.widget_list = [self.start_location_controls, self.checkboxes, self.change_parameters_button,
+                            self.mode_selector, self.control_buttons, self.pf_test_controls,
                             self.image_display, self.image_number_label, self.image_browsing_controls,
                             self.data_file_time_line, self.image_delay_slider, self.data_file_controls,
                             self.cached_data_creator, self.console, self.plotter, self.ui_layout]
@@ -127,8 +162,7 @@ class PfAppBags(PfMainWindow):
     def setup_trunk_data_connection(self):
         if self.using_cached_data:
             self.trunk_data_connection = TrunkDataConnectionCachedData(self.parameters_data.cached_image_dir,
-                                                                       self.image_display.load_image,
-                                                                       actual_position_plot_func=self.plotter.update_actual_position)
+                                                                       self.image_display.load_image)
         else:
             self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
             self.image_display_checkbox_changed()
@@ -188,10 +222,18 @@ class PfAppBags(PfMainWindow):
 
         self.disable_all_widgets()
 
-        if self.mode_selector.mode == "Scroll Images":
-            self.playback_mode.activate_mode()
-        elif self.mode_selector.mode == "PF - Recorded Data":
-            self.pf_mode.activate_mode()
+        for mode in self.modes:
+            if mode.mode_name == self.mode_selector.mode:
+                mode.activate_mode()
+                break
+        # if self.mode_selector.mode == self.playback_mode.mode_name:
+        #     self.playback_mode.activate_mode()
+        # elif self.mode_selector.mode == self.pf_mode.mode_name:
+        #     self.pf_mode.activate_mode()
+        # elif self.mode_selector.mode == self.pf_tests_mode.mode_name:
+        #     self.pf_tests_mode.activate_mode()
+        # elif self.mode_selector.mode == self.pf_live_mode.mode_name:
+        #     self.pf_live_mode.activate_mode()
 
     def data_file_time_line_edited(self):
         time_stamp = self.data_file_time_line.data_file_time_line.text()
@@ -281,15 +323,18 @@ class PfAppBags(PfMainWindow):
 
         return True
 
-    def reset_pf(self):
-        self.start_location_controls.get_parameters()
+    def reset_pf(self, use_ui_parameters=True):
+        if use_ui_parameters:
+            self.start_location_controls.get_parameters()
+        else:
+            self.start_location_controls.set_parameters()
 
         self.pf_engine.reset_pf(self.parameters_pf)
 
         self.reset_gui()
 
     def reset_gui(self):
-        self.control_buttons.num_particles_label.setText(str(self.parameters_pf.num_particles))
+        self.control_buttons.set_num_particles(self.pf_engine.particles.shape[0])
         self.plotter.update_particles(self.pf_engine.downsample_particles())
         self.plotter.update_position_estimate(None)
 
@@ -318,6 +363,14 @@ class PfAppBags(PfMainWindow):
             value = getattr(self.parameters_pf, field.name)
             self.print_message(field.name + ": " + str(value))
 
+    def closeEvent(self, event):
+        # if self.pf_tests_mode is not None:
+        #     self.pf_tests_mode.abort_all_tests()
+        for mode in self.modes:
+            if mode.mode_active:
+                mode.shutdown_hook()
+
+        event.accept()
 
 if __name__ == "__main__":
     pf_app_bag_config_file_path = "/home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf_app_bags.yaml"

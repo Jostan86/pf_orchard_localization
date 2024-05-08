@@ -1,0 +1,42 @@
+# ----------------------
+# General parameters
+# ----------------------
+pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
+
+image_display_scale: 1.0
+
+
+# ----------------------
+# Bi-axe orchard
+# ----------------------
+# width_estimation_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/width_estimation/config/width_estimation_bi-axe_config.yaml
+
+# map_data_path:
+
+# rgb_topic: /camera/color/image_raw
+# depth_topic: /camera/aligned_depth_to_color/image_raw
+# odom_topic: /odometry/filtered
+
+
+# ----------------------
+# Cherry orchard
+# ----------------------
+# width_estimation_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/width_estimation/config/width_estimation_cherry_config.yaml
+
+# map_data_path:
+
+# rgb_topic: /camera/color/image_raw
+# depth_topic: /camera/aligned_depth_to_color/image_raw
+# odom_topic: /odometry/filtered
+
+
+# ----------------------
+# Jazz apple orchard
+# ----------------------
+width_estimation_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/width_estimation/config/width_estimation_jazz_config.yaml
+
+map_data_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/orchard_map_maker/scripts/map_making1/map_data_main.json
+
+rgb_topic: /registered/rgb/image
+depth_topic: /registered/depth/image
+odom_topic: /odometry/filtered

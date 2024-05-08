@@ -103,8 +103,7 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
                  seg_image_display_func: Callable[[Optional[np.ndarray]], None],
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
-                 message_printer: Callable[[List[str]], None] = None,
-                 actual_position_plot_func: Callable[[np.ndarray], None] = None):
+                 message_printer: Callable[[List[str]], None] = None):
 
         super().__init__(seg_image_display_func=seg_image_display_func,
                          class_mapping=class_mapping,
@@ -112,7 +111,6 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
                          message_printer=message_printer)
 
         self.cached_img_directory = cached_img_directory
-        self.actual_position_plot_func = actual_position_plot_func
 
     def get_trunk_data(self, current_msg):
 
@@ -124,20 +122,13 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
         widths = np.array(msg_data['widths'])
         class_estimates = np.array(msg_data['classes'], dtype=np.int32)
 
-        if self.actual_position_plot_func is not None:
-            actual_position = (current_msg['data']['location_estimate'])
-            actual_position_np = np.array([actual_position['x'], actual_position['y']])
-            self.actual_position_plot_func(actual_position_np)
-
         seg_img = self.load_cached_img(current_msg['timestamp'])
-
 
         if seg_img is not None and self.seg_image_display_func is not None:
             self.seg_image_display_func(seg_img)
 
-        if class_estimates is not None:
-            class_estimates = self.remap_classes(class_estimates)
-            self.print_messages(positions, widths)
+        class_estimates = self.remap_classes(class_estimates)
+        self.print_messages(positions, widths)
 
         return positions, widths, class_estimates
 

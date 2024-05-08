@@ -141,7 +141,7 @@ class PFPlotter(QWidget):
                                                                pen=None,
                                                                symbol='o',
                                                                symbolBrush=(213, 94, 0),
-                                                               symbolSize=1.5*self.dot_size,
+                                                               symbolSize=0.75*self.dot_size,
                                                                name='Actual Position')
         self.update_particles(particles)
 

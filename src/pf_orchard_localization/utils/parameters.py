@@ -10,6 +10,9 @@ class Parameters:
     def load_from_yaml(self, file_path):
         logging.info(f"Loading parameters from {file_path}")
 
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Parameter file not found: {file_path}")
+
         with open(file_path, 'r') as file:
             data = yaml.safe_load(file)
 
@@ -90,7 +93,17 @@ class ParametersBagData(Parameters):
 
     image_display_scale: float = None
 
-# @dataclass
-# class ParametersImageSelect(ParametersBag):
+@dataclass
+class ParametersLiveData(Parameters):
+
+    depth_topic: str = None
+    rgb_topic: str = None
+    odom_topic: str = None
+
+    width_estimation_config_file_path: str = None
+    pf_config_file_path: str = None
+    map_data_path: str = None
+
+    image_display_scale: float = None
 
 

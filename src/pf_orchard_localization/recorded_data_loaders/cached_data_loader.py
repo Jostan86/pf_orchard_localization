@@ -14,8 +14,6 @@ class CachedDataLoader(BaseDataLoader):
 
         t_start = None
 
-        print("Opening file: " + file_path)
-
         loaded_data = json.load(open(file_path))
         # get all the time stamps from the data, which are the keys
         time_stamps_keys = list(loaded_data.keys())

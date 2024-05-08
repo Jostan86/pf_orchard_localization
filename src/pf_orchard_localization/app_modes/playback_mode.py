@@ -17,6 +17,7 @@ class PlaybackMode:
         self.mode_active = False
         self.is_processing = False
         self.timer = None
+        self.mode_name = "Playback Images"
 
 
     def control_image_playback(self, command):

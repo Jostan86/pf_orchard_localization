@@ -24,14 +24,22 @@ class DataFileControls(QWidget):
 
         self.data_file_names = None
 
-        self.data_file_selector = QComboBox()
-        self.data_file_selector_layout = QHBoxLayout()
         self.data_file_selector_label = QLabel("Current Data File:")
+        self.data_file_selector_label.setToolTip("Select the data file to open")
         self.data_file_selector_label.setFixedWidth(150)
+
+        self.data_file_selector = QComboBox()
+        self.data_file_selector.setToolTip("Select the data file to open")
+
         self.data_file_open_button = QPushButton("Open Selected")
+        self.data_file_open_button.setToolTip("Open the selected data file")
         self.data_file_open_button.setFixedWidth(150)
+
         self.data_file_open_next_button = QPushButton("Open Next")
+        self.data_file_open_next_button.setToolTip("Open the next data file in the list")
         self.data_file_open_next_button.setFixedWidth(150)
+
+        self.data_file_selector_layout = QHBoxLayout()
         self.data_file_selector_layout.addWidget(self.data_file_selector_label)
         self.data_file_selector_layout.addWidget(self.data_file_selector)
         self.data_file_selector_layout.addWidget(self.data_file_open_button)
@@ -101,7 +109,9 @@ class DataFileControls(QWidget):
     def disable(self):
         self.data_file_selector.setDisabled(True)
         self.data_file_open_button.setDisabled(True)
+        self.data_file_open_next_button.setDisabled(True)
 
     def enable(self):
         self.data_file_selector.setDisabled(False)
         self.data_file_open_button.setDisabled(False)
+        self.data_file_open_next_button.setDisabled(False)

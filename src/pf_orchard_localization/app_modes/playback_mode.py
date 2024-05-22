@@ -117,3 +117,6 @@ class PlaybackMode:
 
     def deactivate_mode(self):
         self.mode_active = False
+
+    def shutdown_hook(self):
+        pass

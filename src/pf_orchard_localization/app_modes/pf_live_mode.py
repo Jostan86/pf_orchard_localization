@@ -83,6 +83,7 @@ class PfLiveMode:
     def depth_image_callback(self, image_msg):
         self.depth_image_msgs.append(image_msg)
         self.depth_image_timestamps.append(image_msg.header.stamp.to_sec())
+
     def odom_callback(self, odom_msg):
         self.odom_msgs.append(odom_msg)
         self.odom_times.append(odom_msg.header.stamp.to_sec())
@@ -99,6 +100,7 @@ class PfLiveMode:
         self.is_processing = True
 
         positions, widths, class_estimates, image_timestamp = self.get_tree_data()
+        tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
 
         if image_timestamp is None:
             self.is_processing = False
@@ -109,14 +111,7 @@ class PfLiveMode:
             self.is_processing = False
             return
 
-        if not self.pf_continuous_active:
-            self.is_processing = False
-            return
-
         self.main_app_manager.queue_size_label.set_queue_size(len(self.rgb_image_msgs))
-
-        tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
-
         # Get the odom messages that are between the previous tree data time and the current tree data time
         start_index = next((i for i, v in enumerate(self.odom_times) if v >= self.previous_image_timestamp), 0)
         end_index = next((i for i, v in enumerate(self.odom_times) if v >= image_timestamp), len(self.odom_times))
@@ -135,6 +130,10 @@ class PfLiveMode:
 
         # Save the current tree data time for the next iteration
         self.previous_image_timestamp = image_timestamp
+
+        if not self.pf_continuous_active:
+            self.is_processing = False
+            return
 
         # Get the average linear and angular velocities, the number of odom readings, and the time of the last odom
         # reading from the odom messages
@@ -230,6 +229,12 @@ class PfLiveMode:
     def activate_mode(self):
         self.mode_active = True
 
+        self.setup_gui()
+        self.connect_gui()
+
+        self.main_app_manager.reset_pf()
+
+    def setup_gui(self):
         mode_change_button_layout = QHBoxLayout()
         mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
         mode_change_button_layout.addWidget(self.main_app_manager.change_parameters_button)
@@ -246,6 +251,7 @@ class PfLiveMode:
         self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
         self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
 
+    def connect_gui(self):
         self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_pf_continuous)
         self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_pf_continuous)
         self.main_app_manager.ros_connect_button.connectButtonClicked.connect(self.connect_to_ros)
@@ -253,9 +259,12 @@ class PfLiveMode:
 
         self.main_app_manager.control_buttons.single_step_button.setDisabled(True)
 
-        self.main_app_manager.reset_pf()
-
     def deactivate_mode(self):
+        self.disconnect_gui()
+        self.mode_active = False
+        self.ensure_pf_stopped()
+
+    def disconnect_gui(self):
         self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_pf_continuous)
         self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_pf_continuous)
         self.main_app_manager.ros_connect_button.connectButtonClicked.disconnect(self.connect_to_ros)
@@ -263,8 +272,6 @@ class PfLiveMode:
 
         self.main_app_manager.control_buttons.single_step_button.setDisabled(False)
 
-        self.mode_active = False
-        self.ensure_pf_stopped()
 
     def shutdown_hook(self):
         self.stop_pf_continuous()

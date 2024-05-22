@@ -6,13 +6,15 @@ from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QWidget
 from ..custom_widgets import (PfMainWindow, PfControlButtons, PfStartLocationControls, PfCheckBoxes,
                               Console, ImageDisplay, PfModeSelector, ImageBrowsingControls, TreatingPFPlotter,
                               DataFileControls, DataFileTimeLine, ImageNumberLabel, ImageDelaySlider, CachedDataCreator,
-                              PfChangeParametersButton, PfTestControls, PfQueueSizeLabel, RosConnectButton)
+                              PfChangeParametersButton, PfTestControls, PfQueueSizeLabel, RosConnectButton,
+                              CalibrationDataControls)
 from ..utils.parameters import ParametersPf, ParametersBagData, ParametersCachedData, ParametersLiveData
 from ..pf_engine import PFEngine
-from ..utils.get_map_data import get_map_data
+# from ..utils.get_map_data import get_map_data
+from map_data_tools import MapData
 import logging
 from ..trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCachedData
-from ..app_modes import PfMode, PfModeCached, PfModeCachedTests, PlaybackMode, PfLiveMode
+from ..app_modes import PfMode, PfModeCached, PfModeCachedTests, PlaybackMode, PfLiveMode, PfModeSaveCalibrationData
 from ..recorded_data_loaders import BagDataLoader, CachedDataLoader
 import os
 from functools import partial
@@ -20,39 +22,42 @@ import time
 # Separate the trunk analyzer import to a separate function to avoid import if not needed
 
 
-class PfAppBags(PfMainWindow):
-    def __init__(self, config_file_path, use_cached_data=False, use_live_data=False, logging_level=logging.DEBUG):
+class PfAppBase(PfMainWindow):
+    def __init__(self, config_file_path, logging_level=logging.DEBUG):
         super().__init__()
 
-        if use_live_data:
-            self.using_cached_data = False
-            self.running_live_mode = True
-        else:
-            self.using_cached_data = use_cached_data
-            self.running_live_mode = False
-
-        if self.using_cached_data:
-            self.parameters_data = ParametersCachedData()
-        elif self.running_live_mode:
-            self.parameters_data = ParametersLiveData()
-        else:
-            self.parameters_data = ParametersBagData()
+        self.init_data_parameters(config_file_path)
 
         self.parameters_data.load_from_yaml(config_file_path)
         self.parameters_pf = ParametersPf()
         self.parameters_pf.load_from_yaml(self.parameters_data.pf_config_file_path)
 
-        self.map_data = get_map_data(map_data_path=self.parameters_data.map_data_path)
+        self.map_data = MapData(map_data_path=self.parameters_data.map_data_path, move_origin=True, origin_offset=(5, 5))
         self.pf_engine = PFEngine(self.map_data)
 
         self.init_widgets()
 
         self.current_msg = None
+        self.active_mode = None
 
         self.connect_app_to_ui()
 
         self.setup_trunk_data_connection()
 
+        self.init_loaded_data()
+
+        self.modes = []
+
+        self.init_modes()
+
+        self.mode_selector.set_modes(self.modes)
+
+        self.mode_changed()
+
+    def init_data_parameters(self, config_file_path):
+        self.parameters_data = None
+
+    def init_loaded_data(self):
         self.data_manager = None
 
         # Select the first item in the combo box
@@ -62,37 +67,16 @@ class PfAppBags(PfMainWindow):
             self.data_file_time_line.set_time_line(float(self.parameters_data.initial_data_time))
             self.data_manager.set_time_stamp(float(self.parameters_data.initial_data_time))
 
-        self.modes = []
-
-        if self.using_cached_data:
-            self.pf_tests_mode = PfModeCachedTests(self)
-            self.modes.append(self.pf_tests_mode)
-            self.pf_mode = PfModeCached(self)
-            self.modes.append(self.pf_mode)
-            self.playback_mode = PlaybackMode(self)
-            self.modes.append(self.playback_mode)
-
-        elif self.running_live_mode:
-            self.pf_live_mode = PfLiveMode(self)
-            self.modes.append(self.pf_live_mode)
-
-        else:
-            self.pf_mode = PfMode(self)
-            self.modes.append(self.pf_mode)
-            self.playback_mode = PlaybackMode(self)
-            self.modes.append(self.playback_mode)
-
-        self.mode_selector.set_modes(self.modes)
-
-        self.mode_changed()
-
-        self.pf_test_controls.load_test("/media/jostan/portabits/test_starts2.csv")
+    def init_modes(self):
+        pass
 
     def init_widgets(self):
         # Set up the main window
         self.setWindowTitle("Orchard Particle Filter Localization App")
 
         self.init_window_display_settings()
+
+        self.widget_list = []
 
         self.main_layout = QHBoxLayout()
 
@@ -104,15 +88,15 @@ class PfAppBags(PfMainWindow):
         self.mode_selector = PfModeSelector()
         self.image_display = ImageDisplay(num_camera_feeds=1, scale_factor=1.0)
         self.image_browsing_controls = ImageBrowsingControls()
-        self.data_file_controls = DataFileControls(self, self.parameters_data)
         self.console = Console()
-        self.data_file_time_line = DataFileTimeLine()
-        self.image_number_label = ImageNumberLabel()
-        self.image_delay_slider = ImageDelaySlider()
-        self.cached_data_creator = CachedDataCreator(self)
-        self.pf_test_controls = PfTestControls(self)
-        self.queue_size_label = PfQueueSizeLabel()
-        self.ros_connect_button = RosConnectButton()
+        #
+        # self.data_file_time_line = None
+        # self.image_number_label = None
+        # self.image_delay_slider = None
+        # self.cached_data_creator = None
+        # self.pf_test_controls = None
+        # self.queue_size_label = None
+        # self.ros_connect_button = None
 
         self.checkboxes = PfCheckBoxes()
         self.checkboxes.all_checkbox_info.append(
@@ -132,13 +116,16 @@ class PfAppBags(PfMainWindow):
         self.setCentralWidget(central_widget)
         central_widget.setLayout(self.main_layout)
 
+        self.init_widgets_unique()
+
         # Note that ui_layout always needs to be at the end of this list or bugs will occur, or really, it needs to have
         # top level widgets added to it last
-        self.widget_list = [self.start_location_controls, self.checkboxes, self.change_parameters_button,
-                            self.mode_selector, self.control_buttons, self.pf_test_controls,
-                            self.image_display, self.image_number_label, self.image_browsing_controls,
-                            self.data_file_time_line, self.image_delay_slider, self.data_file_controls,
-                            self.cached_data_creator, self.console, self.plotter, self.ui_layout]
+        self.widget_list += [self.start_location_controls, self.checkboxes, self.change_parameters_button,
+                            self.mode_selector, self.control_buttons, self.image_display, self.console, self.plotter,
+                             self.ui_layout]
+
+    def init_widgets_unique(self):
+        pass
 
     def connect_app_to_ui(self):
         self.control_buttons.reset_button.clicked.connect(self.reset_pf)
@@ -153,24 +140,20 @@ class PfAppBags(PfMainWindow):
 
         self.mode_selector.mode_selector.currentIndexChanged.connect(self.mode_changed)
 
-        self.data_file_time_line.data_file_time_line.returnPressed.connect(self.data_file_time_line_edited)
+        self.connect_app_to_ui_unique()
+
+    def connect_app_to_ui_unique(self):
+        pass
 
     def disable_all_widgets(self):
         for widget in self.widget_list:
-            widget.setParent(None)
+            if widget is not None:
+                widget.setParent(None)
 
     def setup_trunk_data_connection(self):
-        if self.using_cached_data:
-            self.trunk_data_connection = TrunkDataConnectionCachedData(self.parameters_data.cached_image_dir,
-                                                                       self.image_display.load_image)
-        else:
-            self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
-            self.image_display_checkbox_changed()
+        pass
 
     def image_display_checkbox_changed(self):
-        if self.using_cached_data:
-            self.print_message("Cannot change image display settings when using cached data")
-            return
 
         show_rgb_image = self.checkboxes.show_rgb_image_checkbox.isChecked()
         show_pre_filtered_segmentation = self.checkboxes.show_pre_filtered_segmentation_checkbox.isChecked()
@@ -225,6 +208,7 @@ class PfAppBags(PfMainWindow):
         for mode in self.modes:
             if mode.mode_name == self.mode_selector.mode:
                 mode.activate_mode()
+                self.active_mode = mode
                 break
         # if self.mode_selector.mode == self.playback_mode.mode_name:
         #     self.playback_mode.activate_mode()
@@ -339,14 +323,16 @@ class PfAppBags(PfMainWindow):
         self.plotter.update_position_estimate(None)
 
     def get_pf_active(self):
-        return self.pf_mode.pf_continuous_active
+        if self.active_mode is not None:
+            if hasattr(self.active_mode, "pf_continuous_active"):
+                return self.active_mode.pf_continuous_active
 
     def get_pf_parameters(self):
         return self.parameters_pf
 
     def set_pf_parameters(self, parameters):
-        if self.pf_mode.pf_continuous_active:
-            self.print_message("Cannot change parameters while PF is active")
+        if self.get_pf_active():
+            self.print_message("Cannot change parameters while the particle filter is running")
             return False
         self.parameters_pf = parameters
         return True
@@ -371,6 +357,105 @@ class PfAppBags(PfMainWindow):
                 mode.shutdown_hook()
 
         event.accept()
+
+class PfAppBags(PfAppBase):
+    def __init__(self, config_file_path, logging_level=logging.DEBUG):
+        self.using_cached_data = False
+        super().__init__(config_file_path, logging_level=logging_level)
+
+
+    def init_data_parameters(self, config_file_path):
+        self.parameters_data = ParametersBagData()
+
+    def setup_trunk_data_connection(self):
+        self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
+        self.image_display_checkbox_changed()
+    def init_widgets_unique(self):
+        self.image_browsing_controls = ImageBrowsingControls()
+        self.data_file_controls = DataFileControls(self, self.parameters_data)
+        self.data_file_time_line = DataFileTimeLine()
+        self.image_number_label = ImageNumberLabel()
+        self.image_delay_slider = ImageDelaySlider()
+        self.cached_data_creator = CachedDataCreator(self)
+        self.save_calibration_data_controls = CalibrationDataControls(self)
+
+        self.widget_list += [self.image_browsing_controls, self.data_file_controls, self.data_file_time_line,
+                                self.image_number_label, self.image_delay_slider, self.cached_data_creator, self.save_calibration_data_controls]
+
+
+    def connect_app_to_ui_unique(self):
+        self.data_file_time_line.data_file_time_line.returnPressed.connect(self.data_file_time_line_edited)
+
+    def init_modes(self):
+        self.pf_mode = PfMode(self)
+        self.modes.append(self.pf_mode)
+        self.playback_mode = PlaybackMode(self)
+        self.modes.append(self.playback_mode)
+        self.get_calibration_data_mode = PfModeSaveCalibrationData(self)
+        self.modes.append(self.get_calibration_data_mode)
+
+class PfAppCached(PfAppBase):
+    def __init__(self, config_file_path, logging_level=logging.DEBUG):
+        self.using_cached_data = True
+        super().__init__(config_file_path, logging_level=logging_level)
+
+        self.pf_test_controls.load_test("/media/jostan/portabits/test_starts2.csv")
+
+    def init_data_parameters(self, config_file_path):
+        self.parameters_data = ParametersCachedData()
+
+    def setup_trunk_data_connection(self):
+        self.trunk_data_connection = TrunkDataConnectionCachedData(self.parameters_data.cached_image_dir,
+                                                                   self.image_display.load_image)
+
+    def init_widgets_unique(self):
+        self.image_browsing_controls = ImageBrowsingControls()
+        self.data_file_controls = DataFileControls(self, self.parameters_data)
+        self.data_file_time_line = DataFileTimeLine()
+        self.image_number_label = ImageNumberLabel()
+        self.image_delay_slider = ImageDelaySlider()
+        self.cached_data_creator = CachedDataCreator(self)
+        self.pf_test_controls = PfTestControls(self)
+
+        self.widget_list += [self.image_browsing_controls, self.data_file_controls, self.data_file_time_line,
+                             self.image_number_label, self.image_delay_slider, self.cached_data_creator, self.pf_test_controls]
+    def init_modes(self):
+        self.pf_tests_mode = PfModeCachedTests(self)
+        self.modes.append(self.pf_tests_mode)
+        self.pf_mode = PfModeCached(self)
+        self.modes.append(self.pf_mode)
+        self.playback_mode = PlaybackMode(self)
+        self.modes.append(self.playback_mode)
+
+    def image_display_checkbox_changed(self):
+        self.print_message("Cannot change image display settings when using cached data")
+        pass
+
+
+
+class PfAppLive(PfAppBase):
+    def __init__(self, config_file_path, logging_level=logging.DEBUG):
+        super().__init__(config_file_path, logging_level=logging_level)
+
+    def init_data_parameters(self, config_file_path):
+        self.parameters_data = ParametersLiveData()
+
+    def setup_trunk_data_connection(self):
+        self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
+        self.image_display_checkbox_changed()
+
+    def init_widgets_unique(self):
+        self.queue_size_label = PfQueueSizeLabel()
+        self.ros_connect_button = RosConnectButton()
+
+        self.widget_list += [self.queue_size_label, self.ros_connect_button]
+
+    def init_modes(self):
+        self.pf_live_mode = PfLiveMode(self)
+        self.modes.append(self.pf_live_mode)
+
+    def init_loaded_data(self):
+        pass
 
 if __name__ == "__main__":
     pf_app_bag_config_file_path = "/home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf_app_bags.yaml"

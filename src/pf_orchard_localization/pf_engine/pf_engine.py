@@ -4,16 +4,16 @@ import numpy as np
 from scipy.spatial import KDTree
 from scipy.stats import norm
 from scipy.ndimage import label
-
+from map_data_tools import MapData
 class PFEngine:
 
-    def __init__(self, map_data: dict, random_seed=None) -> None:
+    def __init__(self, map_data: MapData, random_seed=None) -> None:
 
         np.random.seed(random_seed)
 
         # Save the tree positions and widths
-        self.map_positions = map_data['all_position_estimates']
-        self.map_widths = map_data['all_width_estimates']
+        self.map_positions = map_data.all_position_estimates
+        self.map_widths = map_data.all_width_estimates
 
         # Create a KDTree for fast nearest-neighbor lookup of the trees
         self.kd_tree = KDTree(self.map_positions)

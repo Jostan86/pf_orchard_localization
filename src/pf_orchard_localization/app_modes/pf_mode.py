@@ -123,6 +123,12 @@ class PfMode:
     def activate_mode(self):
         self.mode_active = True
 
+        self.setup_gui()
+        self.connect_gui()
+
+        self.main_app_manager.reset_pf()
+
+    def setup_gui(self):
         mode_change_button_layout = QHBoxLayout()
         mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
         mode_change_button_layout.addWidget(self.main_app_manager.change_parameters_button)
@@ -145,20 +151,24 @@ class PfMode:
         self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
         self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
 
+    def connect_gui(self):
         self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_pf_continuous)
         self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_pf_continuous)
         self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.cont_button_clicked)
 
-        self.main_app_manager.reset_pf()
-
     def deactivate_mode(self):
+
+        self.disconnect_gui()
+
+        self.mode_active = False
+
+        self.ensure_pf_stopped()
+
+    def disconnect_gui(self):
         self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_pf_continuous)
         self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_pf_continuous)
         self.main_app_manager.control_buttons.single_step_button.clicked.disconnect(self.cont_button_clicked)
-
-        self.mode_active = False
         self.main_app_manager.cached_data_creator.enable_checkbox.setChecked(False)
-        self.ensure_pf_stopped()
 
     def shutdown_hook(self):
         self.ensure_pf_stopped()
@@ -201,8 +211,7 @@ class PfModeCached(PfMode):
 
         return x_odom, theta_odom, time_stamp_odom
 
-    def activate_mode(self):
-        self.mode_active = True
+    def setup_gui(self):
 
         mode_change_button_layout = QHBoxLayout()
         mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
@@ -225,20 +234,17 @@ class PfModeCached(PfMode):
         self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
         self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
 
+    def connect_gui(self):
         self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_pf_continuous)
         self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_pf_continuous)
         self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.cont_button_clicked)
 
-        self.main_app_manager.reset_pf()
 
-    def deactivate_mode(self):
+    def disconnect_gui(self):
 
         self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_pf_continuous)
         self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_pf_continuous)
         self.main_app_manager.control_buttons.single_step_button.disconnect(self.cont_button_clicked)
-
-        self.mode_active = False
-        self.ensure_pf_stopped()
 
 
 class PfModeCachedTests(PfModeCached):
@@ -387,8 +393,7 @@ class PfModeCachedTests(PfModeCached):
         else:
             return False, distance
 
-    def activate_mode(self):
-        self.mode_active = True
+    def setup_gui(self):
 
         mode_change_button_layout = QHBoxLayout()
         mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
@@ -410,15 +415,21 @@ class PfModeCachedTests(PfModeCached):
         #TODO: see if this works or needs to be changed to setReadOnly
         self.main_app_manager.data_file_time_line.disable()
 
+    def connect_gui(self):
+
         self.main_app_manager.pf_test_controls.runAllTestsClicked.connect(self.run_all_tests)
         self.main_app_manager.pf_test_controls.abortAllTestsClicked.connect(self.abort_all_tests)
         self.main_app_manager.pf_test_controls.runSelectedTestClicked.connect(self.run_selected_test)
         self.main_app_manager.pf_test_controls.abortSelectedTestClicked.connect(self.abort_all_tests)
         self.main_app_manager.pf_test_controls.test_selection_combobox.currentIndexChanged.connect(self.load_test_data)
 
-        self.main_app_manager.reset_pf()
-
     def deactivate_mode(self):
+        self.disconnect_gui()
+
+        self.mode_active = False
+        self.abort_all_tests()
+
+    def disconnect_gui(self):
         self.main_app_manager.data_file_controls.enable()
         self.main_app_manager.data_file_time_line.enable()
 
@@ -427,10 +438,73 @@ class PfModeCachedTests(PfModeCached):
         self.main_app_manager.pf_test_controls.abortAllTestsClicked.disconnect(self.abort_all_tests)
         self.main_app_manager.pf_test_controls.runSelectedTestClicked.disconnect(self.run_selected_test)
         self.main_app_manager.pf_test_controls.abortSelectedTestClicked.disconnect(self.abort_all_tests)
-        self.main_app_manager.pf_test_controls.test_selection_combobox.currentIndexChanged.disconnect(self.load_test_data)
-
-        self.mode_active = False
-        self.abort_all_tests()
+        self.main_app_manager.pf_test_controls.test_selection_combobox.currentIndexChanged.disconnect(
+            self.load_test_data)
 
     def shutdown_hook(self):
         self.abort_all_tests()
+
+class PfModeSaveCalibrationData(PfMode):
+    def __init__(self, main_app_manager):
+        super().__init__(main_app_manager)
+        self.mode_name = "PF - Save Calibration Data"
+
+    def setup_gui(self):
+        mode_change_button_layout = QHBoxLayout()
+        mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
+        mode_change_button_layout.addWidget(self.main_app_manager.change_parameters_button)
+
+        img_delay_time_line_layout = QHBoxLayout()
+        img_delay_time_line_layout.addWidget(self.main_app_manager.data_file_time_line)
+        img_delay_time_line_layout.addWidget(self.main_app_manager.image_delay_slider)
+
+        self.main_app_manager.ui_layout.addLayout(mode_change_button_layout)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.start_location_controls)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.control_buttons)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
+        self.main_app_manager.ui_layout.addLayout(img_delay_time_line_layout)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.save_calibration_data_controls)
+        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
+
+        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
+        self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
+
+    # def connect_gui(self):
+    #     super().connect_gui()
+    #     self.main_app_manager.save_calibration_data_controls.saveButtonClicked.connect(self.save_calibration_data)
+
+    def get_data_from_image_msg(self, current_msg):
+
+        # positions, widths, class_estimates, seg_img = self.main_app_manager.trunk_data_connection.get_trunk_data(
+        #                                                         current_msg, return_seg_img=True)
+        #
+        # if positions is None:
+        #     if self.main_app_manager.cached_data_creator.cache_data_enabled:
+        #         self.main_app_manager.cached_data_creator.cache_tree_data(None, None, None, None,
+        #                                                                   current_msg['timestamp'])
+        #     self.is_processing = False
+        #     return
+        #
+        # self.main_app_manager.image_number_label.set_img_number_label(
+        #     self.main_app_manager.data_manager.current_img_position,
+        #     self.main_app_manager.data_manager.num_img_msgs)
+        #
+        # tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
+        # self.main_app_manager.pf_engine.scan_update(tree_data)
+        #
+        # best_guess = self.main_app_manager.pf_engine.best_particle
+        # self.main_app_manager.plotter.update_particles(self.main_app_manager.pf_engine.downsample_particles())
+        # self.main_app_manager.plotter.update_position_estimate(best_guess)
+        #
+        # if self.main_app_manager.cached_data_creator.cache_data_enabled:
+        #     self.main_app_manager.cached_data_creator.cache_tree_data(positions, widths, class_estimates, best_guess,
+        #                                                               current_msg['timestamp'])
+        #     self.main_app_manager.cached_data_creator.save_image(seg_img, current_msg['timestamp'])
+        super().get_data_from_image_msg(current_msg)
+
+        if self.main_app_manager.save_calibration_data_controls.save_data_enabled:
+            self.main_app_manager.save_calibration_data_controls.save_data(current_msg)
+

@@ -4,6 +4,7 @@ import pyqtgraph as pg
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton
 import numpy as np
+from map_data_tools import MapData
 
 class ClickablePlotWidget(pg.PlotWidget):
     # This class is for a plot widget that emits a signal when clicked about where it was clicked. It also distinguishes
@@ -36,7 +37,7 @@ class ClickablePlotWidget(pg.PlotWidget):
 
 class PFPlotter(QWidget):
     # Class to handle all the plotting for the particle filter app
-    def __init__(self, map_data):
+    def __init__(self, map_data: MapData):
         super().__init__()
 
         # Indicates whether or not to show tree numbers on the plot
@@ -57,12 +58,12 @@ class PFPlotter(QWidget):
         self.plot_widget.setBackground('w')
 
         # Set the map data
-        self.all_position_estimates = np.array(map_data['all_position_estimates'])
-        self.all_class_estimates = np.array(map_data['all_class_estimates'])
-        self.all_object_numbers = map_data['object_numbers']
-        self.test_tree_numbers = map_data['test_tree_numbers']
+        self.all_position_estimates = map_data.all_position_estimates
+        self.all_class_estimates = map_data.all_class_estimates
+        self.all_object_numbers = map_data.object_numbers
+        self.test_tree_numbers = map_data.test_tree_numbers
         # Set class to 2 for test trees
-        self.all_class_estimates[map_data['test_tree_indexes']] = 2
+        self.all_class_estimates[map_data.test_tree_indexes] = 2
 
         # Draw the map
         self.draw_plot()
@@ -110,11 +111,11 @@ class PFPlotter(QWidget):
         test_tree_idx = 0
         if self.show_nums:
             for i, (x, y) in enumerate(self.all_position_estimates):
-                # tree_num_text = pg.TextItem(
-                #     html='<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(
-                #             self.all_object_numbers[i]), anchor=(1.1, 0.5))
-                # tree_num_text.setPos(x, y)
-                # self.plot_widget.addItem(tree_num_text)
+                tree_num_text = pg.TextItem(
+                    html='<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(
+                            self.all_object_numbers[i]), anchor=(1.1, 0.5))
+                tree_num_text.setPos(x, y)
+                self.plot_widget.addItem(tree_num_text)
 
 
                 # Add test tree numbers
@@ -182,7 +183,7 @@ class PFPlotter(QWidget):
 
 
 class TreatingPFPlotter(PFPlotter):
-    def __init__(self, map_data):
+    def __init__(self, map_data: MapData):
         super().__init__(map_data)
     def draw_plot(self, particles=None):
         super().draw_plot(particles)

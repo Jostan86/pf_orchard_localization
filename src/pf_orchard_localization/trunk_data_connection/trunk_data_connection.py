@@ -27,6 +27,12 @@ class TrunkDataConnection:
         self.offset = offset
         self.message_printer = message_printer
 
+        self.positions = None
+        self.widths = None
+        self.class_estimates = None
+        self.seg_img = None
+        self.x_positions_in_image = None
+        self.results_kept = None
     def init_trunk_analyzer(self, width_estimation_config_file_path):
         if width_estimation_config_file_path is not None:
             self.trunk_analyzer, self.trunk_segmenter = import_trunk_analyzer(width_estimation_config_file_path)
@@ -39,10 +45,10 @@ class TrunkDataConnection:
         else:
             seg_img_og = None
 
-        positions, widths, class_estimates, seg_img = self.get_results(current_msg, results_dict, results)
+        self.get_results(current_msg, results_dict, results)
 
-        if seg_img is None:
-            seg_img = current_msg['rgb_image']
+        if self.seg_img is None:
+            self.seg_img = current_msg['rgb_image']
 
         if self.original_image_display_func is not None:
             self.original_image_display_func(current_msg['rgb_image'])
@@ -51,27 +57,25 @@ class TrunkDataConnection:
             self.pre_filtered_segmentation_display_func(seg_img_og)
 
         if self.seg_image_display_func is not None:
-            self.seg_image_display_func(seg_img)
+            self.seg_image_display_func(self.seg_img)
 
         if not return_seg_img:
-            return positions, widths, class_estimates
+            return self.positions, self.widths, self.class_estimates
         else:
-            return positions, widths, class_estimates, seg_img
+            return self.positions, self.widths, self.class_estimates, self.seg_img
 
     def get_results(self, current_msg, results_dict, results):
 
-        positions, widths, class_estimates, x_positions_in_image, results_kept = (
+        self.positions, self.widths, self.class_estimates, self.x_positions_in_image, self.results_kept = (
             self.trunk_analyzer.pf_helper(current_msg['depth_image'], results_dict=results_dict))
 
-        if results_kept is not None:
-            seg_img = results[results_kept].plot()
+        if self.results_kept is not None:
+            self.seg_img = results[self.results_kept].plot()
         else:
-            seg_img = current_msg['rgb_image']
+            self.seg_img = current_msg['rgb_image']
 
-        if class_estimates is not None:
-            class_estimates = self.remap_classes(class_estimates)
-
-        return positions, widths, class_estimates, seg_img
+        if self.class_estimates is not None:
+            class_estimates = self.remap_classes(self.class_estimates)
 
     def remap_classes(self, class_estimates):
         for i, mapped_class in enumerate(self.class_mapping):
@@ -112,25 +116,25 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
 
         self.cached_img_directory = cached_img_directory
 
-    def get_trunk_data(self, current_msg):
+    def get_trunk_data(self, current_msg, return_seg_img=False):
 
         if current_msg['data'] is None:
             return None, None, None
 
         msg_data = current_msg['data']['tree_data']
-        positions = np.array(msg_data['positions'])
-        widths = np.array(msg_data['widths'])
-        class_estimates = np.array(msg_data['classes'], dtype=np.int32)
+        self.positions = np.array(msg_data['positions'])
+        self.widths = np.array(msg_data['widths'])
+        self.class_estimates = np.array(msg_data['classes'], dtype=np.int32)
 
-        seg_img = self.load_cached_img(current_msg['timestamp'])
+        self.seg_img = self.load_cached_img(current_msg['timestamp'])
 
-        if seg_img is not None and self.seg_image_display_func is not None:
-            self.seg_image_display_func(seg_img)
+        if self.seg_img is not None and self.seg_image_display_func is not None:
+            self.seg_image_display_func(self.seg_img)
 
-        class_estimates = self.remap_classes(class_estimates)
-        self.print_messages(positions, widths)
+        self.class_estimates = self.remap_classes(self.class_estimates)
+        self.print_messages(self.positions, self.widths)
 
-        return positions, widths, class_estimates
+        return self.positions, self.widths, self.class_estimates
 
     def load_cached_img(self, time_stamp):
         time_stamp = str(int(1000*time_stamp))

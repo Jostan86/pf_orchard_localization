@@ -74,12 +74,6 @@ class PfLiveMode:
         self.rgb_image_msgs.append(image_msg)
         self.rgb_image_timestamps.append(image_msg.header.stamp.to_sec())
 
-        # if not self.pf_active and len(self.rgb_image_msgs) > 1:
-        #     image_msg = self.rgb_image_msgs.pop(0)
-        #     self.rgb_image_timestamps.pop(0)
-        #     image = self.bridge.imgmsg_to_cv2(image_msg, "bgr8")
-        #     self.qt_window.load_image(image)
-
     def depth_image_callback(self, image_msg):
         self.depth_image_msgs.append(image_msg)
         self.depth_image_timestamps.append(image_msg.header.stamp.to_sec())
@@ -94,12 +88,15 @@ class PfLiveMode:
 
     def update_pf(self):
 
+        # If the system is currently processing data from the previous iteration or if ros is not connected, return
         if self.is_processing or not self.ros_connected:
             return
 
         self.is_processing = True
 
+        # Get the tree data from the oldest pair of matching rgb and depth image, if there is no new data it will return None
         positions, widths, class_estimates, image_timestamp = self.get_tree_data()
+        # Put the data into a dictionary
         tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
 
         if image_timestamp is None:
@@ -117,12 +114,6 @@ class PfLiveMode:
         end_index = next((i for i, v in enumerate(self.odom_times) if v >= image_timestamp), len(self.odom_times))
         odom_msgs_cur = self.odom_msgs[start_index:end_index]
         odom_times_cur = self.odom_times[start_index:end_index]
-
-        # if self.prev_odom_x is not None and len(odom_msgs_cur) > 0:
-        #     self.distance_traveled += np.linalg.norm(np.array([odom_msgs_cur[-1].pose.pose.position.x - self.prev_odom_x, odom_msgs_cur[-1].pose.pose.position.y - self.prev_odom_y]))
-        # if len(odom_msgs_cur) > 0:
-        #     self.prev_odom_x = odom_msgs_cur[-1].pose.pose.position.x
-        #     self.prev_odom_y = odom_msgs_cur[-1].pose.pose.position.y
 
         # Get rid of the odom messages that have been used
         self.odom_msgs = self.odom_msgs[end_index:]
@@ -153,7 +144,6 @@ class PfLiveMode:
 
         self.converged = self.main_app_manager.pf_engine.check_convergence()
 
-        # TODO: update num particle label
         self.main_app_manager.control_buttons.set_num_particles(self.main_app_manager.pf_engine.particles.shape[0])
 
         # # Update whether the particle filter has converged once
@@ -183,6 +173,14 @@ class PfLiveMode:
         self.is_processing = False
 
     def get_tree_data(self):
+        """Get the tree data from the oldest pair of matching rgb and depth image. Return None if there are no new images
+
+        Returns:
+            positions: list of tuples of the form (x, y) representing the positions of the trees/posts relative to the robot
+            widths: list of floats representing the widths of the trees/posts
+            class_estimates: list of integers representing the class estimates of the trees/posts
+            time_stamp: float representing the time stamp of the images
+            """
         if len(self.rgb_image_msgs) == 0 or len(self.depth_image_msgs) == 0:
             return None, None, None, None
 

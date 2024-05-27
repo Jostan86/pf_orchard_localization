@@ -1,1 +1,0 @@
-from .image_select_window_constructor import ImageSelectWindowConstructor

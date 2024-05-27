@@ -40,11 +40,18 @@ pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projec
 #map_data_path: /media/jostan/MOAD/research_data/map_making_data/jazz_apple/map_data_jazz.json
 map_data_path: /media/jostan/MOAD/research_data/map_making_data/jazz_apple/map_data_jazz_new.json
 
-#data_file_dir: /media/jostan/MOAD/research_data/apple_orchard_data/2023_orchard_data/uncompressed/synced/pcl_mod/
-data_file_dir: /media/jostan/portabits/pcl_mod/
+#data_file_dir: /media/jostan/portabits/pcl_mod/
 
+data_file_dir: /media/jostan/MOAD/research_data/apple_orchard_data/2023_orchard_data/uncompressed/synced/pcl_mod/
 rgb_topic: /registered/rgb/image
 depth_topic: /registered/depth/image
+
+#data_file_dir: /media/jostan/MOAD/research_data/apple_orchard_data/achyut_data/sept6/
+#rgb_topic: /camera/color/image_raw
+#depth_topic: /camera/aligned_depth_to_color/image_raw
+
 odom_topic: /odometry/filtered
+
+
 
 

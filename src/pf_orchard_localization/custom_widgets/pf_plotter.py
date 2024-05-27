@@ -111,11 +111,11 @@ class PFPlotter(QWidget):
         test_tree_idx = 0
         if self.show_nums:
             for i, (x, y) in enumerate(self.all_position_estimates):
-                tree_num_text = pg.TextItem(
-                    html='<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(
-                            self.all_object_numbers[i]), anchor=(1.1, 0.5))
-                tree_num_text.setPos(x, y)
-                self.plot_widget.addItem(tree_num_text)
+                # tree_num_text = pg.TextItem(
+                #     html='<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(
+                #             self.all_object_numbers[i]), anchor=(1.1, 0.5))
+                # tree_num_text.setPos(x, y)
+                # self.plot_widget.addItem(tree_num_text)
 
 
                 # Add test tree numbers

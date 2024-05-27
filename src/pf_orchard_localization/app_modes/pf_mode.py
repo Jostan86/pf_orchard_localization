@@ -477,32 +477,6 @@ class PfModeSaveCalibrationData(PfMode):
     #     self.main_app_manager.save_calibration_data_controls.saveButtonClicked.connect(self.save_calibration_data)
 
     def get_data_from_image_msg(self, current_msg):
-
-        # positions, widths, class_estimates, seg_img = self.main_app_manager.trunk_data_connection.get_trunk_data(
-        #                                                         current_msg, return_seg_img=True)
-        #
-        # if positions is None:
-        #     if self.main_app_manager.cached_data_creator.cache_data_enabled:
-        #         self.main_app_manager.cached_data_creator.cache_tree_data(None, None, None, None,
-        #                                                                   current_msg['timestamp'])
-        #     self.is_processing = False
-        #     return
-        #
-        # self.main_app_manager.image_number_label.set_img_number_label(
-        #     self.main_app_manager.data_manager.current_img_position,
-        #     self.main_app_manager.data_manager.num_img_msgs)
-        #
-        # tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
-        # self.main_app_manager.pf_engine.scan_update(tree_data)
-        #
-        # best_guess = self.main_app_manager.pf_engine.best_particle
-        # self.main_app_manager.plotter.update_particles(self.main_app_manager.pf_engine.downsample_particles())
-        # self.main_app_manager.plotter.update_position_estimate(best_guess)
-        #
-        # if self.main_app_manager.cached_data_creator.cache_data_enabled:
-        #     self.main_app_manager.cached_data_creator.cache_tree_data(positions, widths, class_estimates, best_guess,
-        #                                                               current_msg['timestamp'])
-        #     self.main_app_manager.cached_data_creator.save_image(seg_img, current_msg['timestamp'])
         super().get_data_from_image_msg(current_msg)
 
         if self.main_app_manager.save_calibration_data_controls.save_data_enabled:

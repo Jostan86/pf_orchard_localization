@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import (QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QApplication, QLineEdit, QCheckBox,
                              QPlainTextEdit, QMainWindow, QComboBox, QFileDialog, QInputDialog, QDialog, QSlider,
-                             QListWidget, QMessageBox, QSpinBox, QDateEdit)
+                             QListWidget, QMessageBox, QSpinBox)
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtCore import Qt, pyqtSignal, QDate
+from PyQt5.QtCore import Qt, pyqtSignal
 import math
 import cv2
 import numpy as np
@@ -237,6 +237,7 @@ class PfStartLocationControls(QWidget):
 
         if not success:
             self.main_app_manager.print_message("Failed to set start location parameters")
+
     def set_start_location_from_plot_click(self, x, y, shift_pressed):
         # Method for handling when the plot is clicked, if shift is held down, set the particle start position to the
         # clicked location
@@ -856,51 +857,40 @@ class CalibrationDataControls(QWidget):
         self.change_save_location_button = QPushButton("Change")
         self.change_save_location_button.setToolTip("Change the location to save the calibration data")
 
-        self.tree_number_label = QLabel("Tree Number:")
-        self.tree_number_label.setToolTip("Number of the tree to save the calibration data for")
-        self.tree_number_input = QLineEdit()
-        self.tree_number_input.setToolTip("Number of the tree to save the calibration data for")
-
         self.data_note_label = QLabel("Data Note:")
         self.data_note_label.setToolTip("Note to save with the data")
         self.data_note_input = QLineEdit()
-        self.data_note_input.setToolTip("e.g. from september 2021 jazz")
-
-        self.actual_width_label = QLabel("Actual Width:")
-        self.actual_width_label.setToolTip("Actual width of the tree from ground truth")
-        self.actual_width_label.setFixedWidth(150)
-        self.actual_width = None
+        self.data_note_input.setPlaceholderText("e.g. from september 2021 jazz")
+        self.data_note_input.setToolTip("Note to save with the data")
+        # self.data_note_input.setFixedWidth(450)
 
         self.ground_truth_date_label = QLabel("Ground Truth Date:")
         self.ground_truth_date = None
-        self.date_edit = QDateEdit()
-        self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDate(QDate.currentDate())
-        self.date_edit.setToolTip("Date the ground truth data was collected")
+        self.date_edit = QSpinBox()
+        self.date_edit.setRange(2000, 2100)
+        self.date_edit.setValue(2021)
+        self.date_edit.setToolTip("Ground truth date of the data")
+        self.date_edit.setFixedWidth(150)
+
 
         self.layout_1 = QHBoxLayout()
         self.layout_2 = QHBoxLayout()
-        self.layout_3 = QHBoxLayout()
 
         self.layout_1.addWidget(self.save_data_checkbox)
         self.layout_1.addWidget(self.save_location_label)
         self.layout_1.addWidget(self.save_location_input)
         self.layout_1.addWidget(self.change_save_location_button)
 
-        self.layout_2.addWidget(self.tree_number_label)
-        self.layout_2.addWidget(self.tree_number_input)
+        self.layout_2.addWidget(self.data_note_label)
         self.layout_2.addWidget(self.data_note_input)
-        self.layout_2.addWidget(self.data_note_input)
-        self.layout_2.addWidget(self.actual_width_label)
 
-        self.layout_3.addWidget(self.ground_truth_date_label)
-        self.layout_3.addWidget(self.date_edit)
+        self.layout_2.addWidget(self.ground_truth_date_label)
+        self.layout_2.addWidget(self.date_edit)
 
         self.main_layout = QVBoxLayout()
 
         self.main_layout.addLayout(self.layout_1)
         self.main_layout.addLayout(self.layout_2)
-        self.main_layout.addLayout(self.layout_3)
 
         self.setLayout(self.main_layout)
 
@@ -920,6 +910,19 @@ class CalibrationDataControls(QWidget):
         if self.save_data_checkbox.isChecked() == False:
             self.main_app_manager.print_message("Data not being saved")
             return
+
+        closest_objects, kept_idx = self.find_closest_tree()
+
+        if len(closest_objects) == 0:
+            self.main_app_manager.print_message("No tree detected")
+            return
+
+        if len(closest_objects) > 1:
+            self.main_app_manager.print_message("More than one tree detected ???")
+            return
+
+        tree_data = closest_objects[0]
+        kept_idx = kept_idx[0]
 
         rgb_image = current_msg["rgb_image"]
         depth_image = current_msg["depth_image"]
@@ -941,25 +944,7 @@ class CalibrationDataControls(QWidget):
             self.main_app_manager.print_message("Save location does not exist")
             return
 
-        try:
-            tree_number = int(self.tree_number_input.text())
-        except ValueError:
-            self.main_app_manager.print_message("Tree number must be an integer")
-            return
-
-
-        tree_data = None
-        for object_data in self.main_app_manager.map_data.map_data:
-            if object_data.object_number == tree_number:
-                tree_data = copy.deepcopy(object_data)
-        if tree_data is None:
-            self.main_app_manager.print_message("That tree number does not exist")
-            return
-        if tree_data.ground_truth_width is None:
-            self.main_app_manager.print_message("No ground truth width available")
-            return
-
-        ground_truth_date = self.date_edit.date().toString("yyyy-MM-dd")
+        ground_truth_date = self.date_edit.value()
 
         timestamp_secs = int(time_stamp)
         timestamp_ns = int((time_stamp - timestamp_secs) * 1e9)
@@ -967,34 +952,11 @@ class CalibrationDataControls(QWidget):
 
         data_note = self.data_note_input.text()
 
-        if len(x_positions_in_image) == 1:
-            x_position_in_image = x_positions_in_image[0]
-            measured_width = self.main_app_manager.trunk_data_connection.widths[0]
-        else:
-            if self.previous_x_position_in_image is None:
-                # ask user to select the correct trunk
-                dialog = MultiTrunkDialog(x_positions_in_image)
-                dialog.exec_()
-                selected_trunk = dialog.get_selected_trunk()
-                x_position_in_image = x_positions_in_image[selected_trunk]
-                self.previous_x_position_in_image = x_position_in_image
-            else:
-                # find closest trunk to previous trunk
-                selected_trunk = np.argmin(np.abs(np.array(x_positions_in_image) - self.previous_x_position_in_image))
-                x_position_in_image = x_positions_in_image[selected_trunk]
-
-                # if it's over 50 pixels away, ask user to select the correct trunk
-                if abs(x_position_in_image - self.previous_x_position_in_image) > 30:
-                    dialog = MultiTrunkDialog(x_positions_in_image)
-                    dialog.exec_()
-                    selected_trunk = dialog.get_selected_trunk()
-                    x_position_in_image = x_positions_in_image[selected_trunk]
-
-                self.previous_x_position_in_image = x_position_in_image
-
-            measured_width = self.main_app_manager.trunk_data_connection.widths[selected_trunk]
 
         tree_data.convert_to_lat_lon()
+
+        x_position_in_image = x_positions_in_image[kept_idx]
+        measured_width = self.main_app_manager.trunk_data_connection.widths[kept_idx]
 
         data_to_save = {"tree_number": tree_data.object_number,
                         "tree_position": tree_data.position_estimate,
@@ -1016,6 +978,41 @@ class CalibrationDataControls(QWidget):
             json.dump(data_to_save, f, indent=4)
 
         self.main_app_manager.print_message("Data saved to: " + data_save_location)
+
+    def find_closest_tree(self):
+        tree_positions = self.main_app_manager.trunk_data_connection.positions
+        class_estimates = self.main_app_manager.trunk_data_connection.class_estimates
+        best_particle = self.main_app_manager.pf_engine.best_particle
+
+        # make the 3, array a 1,3 array
+        best_particle = best_particle.reshape(1, -1)
+
+        tree_global_coords = self.main_app_manager.pf_engine.get_object_global_locations(best_particle, tree_positions)
+
+        closest_objects = []
+        kept_idx = []
+
+        for i in range(len(tree_global_coords)):
+
+            if class_estimates[i] == 1:
+                continue
+
+            distance, idx = self.main_app_manager.pf_engine.kd_tree.query(tree_global_coords[i, :, :])
+
+            if distance > 0.25:
+                continue
+
+            closest_object = copy.deepcopy(self.main_app_manager.map_data.map_data[idx[0]])
+
+            if closest_object.ground_truth_width is None:
+                continue
+
+            closest_objects.append(closest_object)
+
+            kept_idx.append(i)
+
+        return closest_objects, kept_idx
+
 
     @property
     def save_data_enabled(self):

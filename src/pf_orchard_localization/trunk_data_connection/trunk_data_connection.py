@@ -75,13 +75,14 @@ class TrunkDataConnection:
             self.seg_img = current_msg['rgb_image']
 
         if self.class_estimates is not None:
-            class_estimates = self.remap_classes(self.class_estimates)
+            self.class_estimates = self.remap_classes(self.class_estimates)
 
     def remap_classes(self, class_estimates):
-        for i, mapped_class in enumerate(self.class_mapping):
-            class_estimates[class_estimates == i] = mapped_class
+        class_estimates_copy = class_estimates.copy()
+        for i, class_num in enumerate(self.class_mapping):
+            class_estimates_copy[class_estimates == i] = class_num
 
-        return class_estimates
+        return class_estimates_copy
 
     def print_messages(self, positions, widths):
         messages = []

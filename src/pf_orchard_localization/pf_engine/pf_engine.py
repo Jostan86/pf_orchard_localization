@@ -41,6 +41,7 @@ class PFEngine:
 
         self.particles = self.initialize_particles(num_particles)
         num_particles = self.particles.shape[0]
+
         self.particle_weights = np.ones(num_particles) / num_particles
         self.best_particle = self.particles[0]
 
@@ -59,7 +60,17 @@ class PFEngine:
 
         self.histogram = None
 
-    def initialize_particles(self, num_particles):
+    def initialize_particles(self, num_particles: int):
+        """
+        Initialize the particle poses
+
+        Args:
+            num_particles (int): The number of particles to initialize with
+
+        Returns:
+            np.ndarray: An array of shape (num_particles, 3) containing the initial particle poses as (x, y, theta)
+
+        """
 
         start_pose_center_x = self.start_pose_center[0]
         start_pose_center_y = self.start_pose_center[1]
@@ -69,9 +80,10 @@ class PFEngine:
         orientation_min = -self.orientation_range / 2
         orientation_max = self.orientation_range / 2
 
-        # Initialize the particles as a numpy array of shape (num_particles, 3) with columns (x, y, theta) in a uniform
-        # distribution around the start pose
+        # Initialize the particles
         particles = np.zeros((num_particles, 3))
+
+        # Set the x and y coordinates of the particles to be uniformly distributed around the start pose center
         particles[:, 0] = np.random.uniform(start_pose_center_x - start_pose_width_by_2,
                                             start_pose_center_x + start_pose_width_by_2,
                                             num_particles)
@@ -79,6 +91,7 @@ class PFEngine:
                                             start_pose_center_y + start_pose_height_by_2,
                                             num_particles)
 
+        # Set the orientation of the particles to be uniformly distributed around the orientation center, or put half facing the oposite direction if spawn_in_both_directions is True
         if self.spawn_in_both_directions:
             half_particle_num = int(num_particles / 2)
             particles[:half_particle_num, 2] = np.random.uniform(orientation_min, orientation_max, half_particle_num) + self.orientation_center
@@ -97,18 +110,16 @@ class PFEngine:
 
         return particles
 
-    def handle_odom(self, x_odom, theta_odom, time_stamp, num_readings=1):
-        """Handle the odom message. This will be called every time an odom message is received.
+    def handle_odom(self, x_odom: float, theta_odom: float, time_stamp:float, num_readings: int = 1):
+        """
+        Handle the odom message. This will be called every time an odom message is received.
 
-        Parameters
-        ----------
-        x_odom
-            The linear velocity of the robot in the forward direction, in meters per second
-        theta_odom
-            The angular velocity of the robot, in radians per second
-        time_stamp
-            The time stamp of the odom message, in seconds
-            """
+        Args:
+            x_odom (float): The linear velocity of the robot in the forward direction, in meters per second
+            theta_odom (float): The angular velocity of the robot, in radians per second
+            time_stamp (float): The current time stamp of the odom message, in seconds
+            num_readings (int): The number of readings that have been received since the last odom message was processed
+        """
 
         # If this is the first odom message, zero the time and return
         if not self.odom_zerod:
@@ -119,11 +130,11 @@ class PFEngine:
         # Calculate the time step size
         dt_odom = time_stamp - self.prev_t_odom
 
-        # Save the current time stamp for the next time step
         self.prev_t_odom = time_stamp
 
         # Set up the control input
         u = np.array([[x_odom], [theta_odom]])
+
         self.motion_update(u, dt_odom, num_readings)
 
     def scan_update(self, tree_msg):
@@ -151,16 +162,21 @@ class PFEngine:
         self.resample_particles()
 
     def motion_update(self, u: np.ndarray, dt: float, num_readings: int):
-        """Propagate the particles forward in time using the motion model."""
+        """
+        Propagate the particles forward in time using the motion model.
+
+        Args:
+            u (np.ndarray): The control input, consisting of the linear velocity in the forward direction and the angular velocity
+            dt (float): The time step size
+            num_readings (int): The number of readings that have been received since the last odom message was processed
+        """
+
 
         num_particles = self.particles.shape[0]
 
-        # Make array of noise. Noise amount depends on number of readings, which isn't exactly logical but my
-        # reasoning is many small movements with guassian noise added to the velocity will be similar to one large
-        # movement with less noise added to the velocity. When I originally 'tuned' the model it updated at every
-        # odom message, but then i changed it to add odom messages together and only update when a new image is
-        # available, to save processing time.
+        # Make array of noise. Noise is averaged over multiple readings if num_readings > 1
         noise = np.random.randn(num_particles, 2) @ (self.R / np.sqrt(num_readings))
+
         # Add noise to control/odometry velocities
         ud = u + noise.T
 
@@ -183,12 +199,21 @@ class PFEngine:
     def resample_particles(self):
         """Resample the particles according to the particle weights using the low variance sampling algorithm."""
 
+        # Get the number of particles to resample
         num_particles = self.calculate_num_particles(self.particles)
 
+        # Calculate the step size for resampling
         step_size = np.random.uniform(0, 1 / num_particles)
+
+        # Set a starting position for the resampling
         cur_weight = self.particle_weights[0]
         idx_w = 0
+
+        # Initialize the new particles array
         new_particles = np.zeros((num_particles, 3))
+
+        # TODO: i think this can be a numpy operation
+        # Use the low variance sampling algorithm to resample the particles
         for idx_m in range(num_particles):
             U = step_size + idx_m / num_particles
             while U > cur_weight:
@@ -197,6 +222,8 @@ class PFEngine:
             new_particles[idx_m, :] = self.particles[idx_w, :]
 
         self.particles = new_particles
+
+        # Reset the particle weights
         self.particle_weights = np.ones(num_particles) / num_particles
 
     def get_object_global_locations(self, particle_states: np.ndarray, object_locations: np.ndarray) -> np.ndarray:
@@ -204,18 +231,14 @@ class PFEngine:
         Calculates the location of the given objects in the global frame for each particle by transforming the object
         locations in the particle frames to the global frame.
 
-        Parameters:
-        ----------
-        particle_states : np.ndarray
-            An array of shape (n, 3) containing the states of the particles
-        object_locations : np.ndarray
-            An array of shape (n, 2) containing the locations of the objects seen by the robot
+        Args:
+            particle_states (np.ndarray): An array of shape (n, 3) containing the states of the particles
+            object_locations (np.ndarray): An array of shape (n, 2) containing the locations of the objects seen by the robot
 
         Returns
-         ----------
-         np.ndarray
-            A MxNx2 numpy array, with x and y coordinates for each object relative to each particle. Here n is the
-            number of particles and m is the number of trees.
+
+            np.ndarray: A MxNx2 numpy array, with x and y coordinates for each object relative to each particle. Here n
+            is the number of particles and m is the number of trees.
         """
 
         # Calculate sin and cos of particle angles
@@ -233,7 +256,7 @@ class PFEngine:
 
     def object_local_polar_transform(self, particle_states: np.ndarray, object_locs: np.ndarray) -> np.ndarray:
         """
-        Calculates an array of object locations the object's location in the local frame.
+        Calculates an array of the object's location in the local frame.
 
         Parameters:
         ----------
@@ -270,7 +293,7 @@ class PFEngine:
         particle_states : np.ndarray
             An array of shape (n, 3) containing the states of the particles
         sensed_tree_coords : np.ndarray
-            An array of shape (n, 2) containing the locations of the trees in the global frame for each particle. m is the
+            An array of shape (m, n, 2) containing the locations of the trees in the global frame for each particle. m is the
             number of trees and n is the number of particles.
         widths_sensed : np.ndarray
             An array containing the widths of the trees.

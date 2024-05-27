@@ -1,32 +1,54 @@
+# Center of the area where particles are initially placed
 start_pose_center_x: 16.0  # meters
 start_pose_center_y: 99.2  # meters
+
+# Density of particles in the initial distribution
 particle_density: 200  # particles / m^2
-#start_width: 6.0  # meters
+
+# Size and orientation of the square shaped area where particles are initially placed
 start_width: 4.0  # meters
 start_height: 20.0  # meters
-#start_height: 22.0  # meters
 start_rotation: -32.0  # degrees
+
+# Orientation of the particles in the initial distribution, so here particles will be oriented in theta = 53 - 63 degrees and 233 - 243 degrees
 start_orientation_center: 58.0  # degrees
 start_orientation_range: 10.0  # degrees
 spawn_particles_in_both_directions: true
 
+# Whether to stop the system when the filter has converged to a single cluster of particles (useful for testing)
+stop_when_converged: true
+
+# Translation between the camera and the robot base frame
 #x_offset: 0.8
 #y_offset: -0.55
-x_offset: 0.0
-y_offset: 0.0
+x_offset: 0.0 # meters
+y_offset: 0.0 # meters
 
-bin_angle: 10
-bin_size: 1.0
+# Size of the bins that the space containing the particles is divided into when calculating the spread of the particles
+bin_size: 1.0 # meters
+# Angle size that each bin is subdivided into when calculating the spread of the particles
+bin_angle: 10 # degrees
+
+# Parameters that are used to calculate how many particles to sample based on the spread of the particles
 delta: 0.05
-range_sd: 0.5
-bearing_sd: 0.3
 epsilon: 0.010
-r_angle: 20
-r_dist: 0.6
+
+# The standard deviation of the expected noise from the range and bearing measurements of the trees made by the camera
+range_sd: 0.5 # meters
+bearing_sd: 0.3 # radians
+
+# The standard deviation of the expected noise from the width measurements of the trees made by the camera
 width_sd: 0.025
+
+# The standard deviations of the amount of noise to add to the linear and angular movements of the particles.
+r_angle: 20 # degrees
+r_dist: 0.6 # meters
+
+# Whether to include the width measurement in the likelihood calculation
 include_width: true
 
+# Maximum and minimum number of particles that the filter can have
+# These are optional, if not included the filter will not have a maximum or minimum number of particles
 max_num_particles: 2000000
 min_num_particles: 100
 
-stop_when_converged: true

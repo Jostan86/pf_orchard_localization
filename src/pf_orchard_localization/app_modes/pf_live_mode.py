@@ -135,15 +135,20 @@ class PfLiveMode:
             num_readings = len(odom_msgs_cur)
             self.main_app_manager.pf_engine.handle_odom(x_odom, theta_odom, time_stamp_odom, num_readings=num_readings)
 
+        # Do the particle filter sensor update
         self.main_app_manager.pf_engine.scan_update(tree_data)
 
+        # Get the best particle from the particle filter
         best_guess = self.main_app_manager.pf_engine.best_particle
+
+        # Update the app plot with the new data
         self.main_app_manager.plotter.update_particles(self.main_app_manager.pf_engine.downsample_particles())
         self.main_app_manager.plotter.update_position_estimate(best_guess)
-        #
 
+        # Check if the particles have converged
         self.converged = self.main_app_manager.pf_engine.check_convergence()
 
+        # Update the particle number in the GUI
         self.main_app_manager.control_buttons.set_num_particles(self.main_app_manager.pf_engine.particles.shape[0])
 
         # # Update whether the particle filter has converged once

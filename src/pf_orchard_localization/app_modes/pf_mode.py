@@ -244,7 +244,7 @@ class PfModeCached(PfMode):
 
         self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_pf_continuous)
         self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_pf_continuous)
-        self.main_app_manager.control_buttons.single_step_button.disconnect(self.cont_button_clicked)
+        self.main_app_manager.control_buttons.single_step_button.clicked.disconnect(self.cont_button_clicked)
 
 
 class PfModeCachedTests(PfModeCached):

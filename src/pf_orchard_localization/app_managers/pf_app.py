@@ -2,6 +2,7 @@
 import sys
 from dataclasses import fields
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QWidget
+from PyQt5.QtGui import QSurfaceFormat
 from ..custom_widgets import (PfMainWindow, PfControlButtons, PfStartLocationControls, PfCheckBoxes,
                               Console, ImageDisplay, PfModeSelector, ImageBrowsingControls, TreatingPFPlotter,
                               DataFileControls, DataFileTimeLine, ImageNumberLabel, ImageDelaySlider, CachedDataCreator,
@@ -338,7 +339,6 @@ class PfAppBase(PfMainWindow):
             use_ui_parameters (bool): Whether to use the parameters set in the UI or the parameters set in the app
         """
         if use_ui_parameters:
-            print('hi')
             self.start_location_controls.get_parameters()
         else:
             self.start_location_controls.set_parameters()

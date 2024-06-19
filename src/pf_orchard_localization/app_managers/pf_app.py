@@ -14,7 +14,7 @@ from map_data_tools import MapData
 import logging
 from ..trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCachedData
 from ..app_modes import PfMode, PfModeCached, PfModeCachedTests, PlaybackMode, PfLiveMode, PfModeSaveCalibrationData
-from ..recorded_data_loaders import BagDataLoader, CachedDataLoader
+from ..recorded_data_loaders import Bag2DataLoader, CachedDataLoader
 import os
 from functools import partial
 import time
@@ -279,13 +279,24 @@ class PfAppBase(PfMainWindow):
 
         data_file_path = self.data_file_controls.data_file_dir + data_file_name
 
-        if not os.path.isfile(data_file_path):
+
+        if not os.path.isfile(data_file_path) and not os.path.isdir(data_file_path):
             self.data_file_controls.set_opened("Invalid file name")
             return
         elif self.using_cached_data and data_file_path.endswith(".json"):
             data_manager = CachedDataLoader(data_file_path)
-        elif data_file_path.endswith(".bag"):
-            data_manager = BagDataLoader(data_file_path, self.parameters_data.depth_topic, self.parameters_data.rgb_topic, self.parameters_data.odom_topic)
+        elif os.path.isdir(data_file_path):
+            files = os.listdir(data_file_path)
+            if len(files) == 2:
+                file_endings = [file.split(".")[-1] for file in files]
+                if "yaml" in file_endings and "db3" in file_endings:
+                    data_manager = Bag2DataLoader(data_file_path, self.parameters_data.depth_topic, self.parameters_data.rgb_topic, self.parameters_data.odom_topic)
+                else:
+                    self.data_file_controls.set_opened("Invalid file type")
+                    return
+            else:
+                self.data_file_controls.set_opened("Invalid file type")
+                return
         else:
             self.data_file_controls.set_opened("Invalid file type")
             return
@@ -447,7 +458,7 @@ class PfAppCached(PfAppBase):
         self.using_cached_data = True
         super().__init__(config_file_path, logging_level=logging_level)
 
-        self.pf_test_controls.load_test("/media/jostan/portabits/test_starts2.csv")
+        self.pf_test_controls.load_test(self.parameters_data.test_start_info_path)
 
     def init_data_parameters(self, config_file_path):
         self.parameters_data = ParametersCachedData()

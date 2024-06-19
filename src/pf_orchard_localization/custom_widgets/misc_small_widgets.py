@@ -6,14 +6,11 @@ from PyQt5.QtCore import Qt, pyqtSignal
 import math
 import cv2
 import numpy as np
-from ..utils.parameters import ParametersPf
 from . import PfSettingsDialog
 import time
 import logging
 import json
 import os
-import csv
-import datetime
 import copy
 
 class PfMainWindow(QMainWindow):

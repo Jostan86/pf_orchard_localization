@@ -2,7 +2,7 @@
 # General parameters
 # ----------------------
 #image_save_dir: /media/jostan/portabits/map_making_data/cherry_orchard/training_images/training_images_test/
-image_save_dir: /home/jostan/Documents/save_test1/
+image_save_dir: /media/jostan/portabits/pf_app_data/image_save_dir
 initial_data_time: 0  # seconds into the bag file
 initial_data_file_index: 0  # index of the bag file
 
@@ -34,15 +34,16 @@ image_display_scale: 1.0
 # ----------------------
 # Jazz apple orchard
 # ----------------------
-width_estimation_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/width_estimation/config/width_estimation_jazz_config.yaml
-pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
+# width_estimation_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/width_estimation/config/width_estimation_jazz_config.yaml
+pf_config_file_path: /pf_orchard_localization/particle-filter-app/config/parameters_pf.yaml
 
 #map_data_path: /media/jostan/MOAD/research_data/map_making_data/jazz_apple/map_data_jazz.json
 map_data_path: /media/jostan/portabits/pf_app_data/map_data_jazz_new.json
 
 #data_file_dir: /media/jostan/portabits/pcl_mod/
 
-data_file_dir: /media/jostan/portabits/pcl_mod_ros2/
+data_file_dir: /media/jostan/portabits/pf_app_data/bag_data_feb_2023/
+
 rgb_topic: /registered/rgb/image
 depth_topic: /registered/depth/image
 
@@ -51,7 +52,3 @@ depth_topic: /registered/depth/image
 #depth_topic: /camera/aligned_depth_to_color/image_raw
 
 odom_topic: /odometry/filtered
-
-
-
-

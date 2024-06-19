@@ -89,7 +89,7 @@ class PfMode:
         odom_data = current_msg['data']
         x_odom = odom_data.twist.twist.linear.x
         theta_odom = odom_data.twist.twist.angular.z
-        time_stamp_odom = odom_data.header.stamp.to_sec()
+        time_stamp_odom = odom_data.header.stamp.sec + odom_data.header.stamp.nanosec * 1e-9
 
         if self.main_app_manager.cached_data_creator.cache_data_enabled:
             self.main_app_manager.cached_data_creator.cache_odom_data(x_odom, theta_odom, time_stamp_odom)

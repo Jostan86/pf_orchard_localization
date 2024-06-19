@@ -70,11 +70,14 @@ class ParametersCachedData(Parameters):
 
     data_file_dir: str = None
     cached_image_dir: str = None
+    test_start_info_path: str = None
+
     initial_data_file_index: int = None
     initial_data_time: float = None
 
     pf_config_file_path: str = None
     map_data_path: str = None
+
 
 @dataclass
 class ParametersBagData(Parameters):

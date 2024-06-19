@@ -17,9 +17,14 @@ initial_data_file_index: 0  # index of the bag file
 # Jazz apple orchard
 # ----------------------
 pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
-map_data_path: /media/jostan/MOAD/research_data/map_making_data/jazz_apple/map_data_jazz_new.json
+map_data_path: /media/jostan/portabits/pf_app_data/map_data_jazz_new.json
 
-data_file_dir: /media/jostan/portabits/pf_saved_data/pf_data/
-cached_image_dir: /media/jostan/portabits/pf_saved_data/images/
+data_file_dir: /media/jostan/portabits/pf_app_data/pf_cached_data/pf_data/
+cached_image_dir: /media/jostan/portabits/pf_app_data/pf_cached_data/images/
 
-
+# jetson
+#pf_config_file_path: /pf_orchard_localization/particle-filter-app/config/parameters_pf.yaml
+#map_data_path: /media/jostan/portabits/pf_app_data/map_data_jazz_new.json
+#
+#data_file_dir: /media/jostan/portabits/pf_app_data/pf_cached_data/pf_data/
+#cached_image_dir: /media/jostan/portabits/pf_app_data/pf_cached_data/images/

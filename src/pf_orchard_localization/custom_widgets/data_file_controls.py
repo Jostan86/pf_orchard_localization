@@ -1,7 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QComboBox, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QLineEdit
 from PyQt5.QtCore import pyqtSignal
 import os
-from ..recorded_data_loaders import BagDataLoader, CachedDataLoader
 import logging
 
 class DataFileControls(QWidget):
@@ -72,8 +71,6 @@ class DataFileControls(QWidget):
 
         if self.main_app_manager.using_cached_data:
             self.data_file_names = [file_name for file_name in self.data_file_names if file_name.endswith(".json")]
-        else:
-            self.data_file_names = [file_name for file_name in self.data_file_names if file_name.endswith(".bag")]
 
         self.data_file_names.sort()
 

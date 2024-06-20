@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from cv_bridge import CvBridge, CvBridgeError
-import rosbag
+
 from pf_orchard_localization.recorded_data_loaders import BaseDataLoader
 
 from pathlib import Path
@@ -11,8 +11,8 @@ class BagDataLoader(BaseDataLoader):
     def __init__(self, file_path, depth_topic, rgb_topic, odom_topic):
 
         super().__init__()
-
-        self.rosbag = rosbag
+       
+        self.rosbag_import()
         self.bridge = CvBridge()
         self.depth_topic = depth_topic
         self.rgb_topic = rgb_topic
@@ -23,6 +23,10 @@ class BagDataLoader(BaseDataLoader):
         self.t_start = None
 
         self.open_file(file_path)
+    
+    def rosbag_import(self):
+        import rosbag
+        self.rosbag = rosbag
 
     @staticmethod
     def bag_timestamp_to_sec(time):
@@ -95,7 +99,10 @@ class Bag2DataLoader(BagDataLoader):
         self.typestore = get_typestore(Stores.ROS2_HUMBLE)
 
         super().__init__(file_path, depth_topic, rgb_topic, odom_topic)
-
+        
+    def rosbag_import(self):
+        ...
+        
     @staticmethod
     def bag_timestamp_to_sec(time):
         return time * 1e-9  # convert from nanoseconds to seconds

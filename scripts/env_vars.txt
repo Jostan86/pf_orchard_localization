@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+
+import rospkg
+import os
+
+pkg_dir = rospkg.RosPack().get_path('pf_trunk_width')
+
+# pkg_dir = '/home/jostan/catkin_ws/src/pkgs_noetic/research_pkgs/pf_trunk_width/'
+os.environ['MAP_DATA_PATH'] = os.path.join(pkg_dir, 'scripts/map_making/map_data_main.json')
+
+os.environ['PARAMETERS_PF_PATH'] = os.path.join(pkg_dir, 'config/parameters_pf.yaml')
+os.environ['PARAMETERS_APP_PATH'] = os.path.join(pkg_dir, 'config/parameters_app_data.yaml')
+os.environ['PARAMETERS_BAG_DATA_PATH'] = os.path.join(pkg_dir, 'config/parameters_bag_data.yaml')
+os.environ['PARAMETERS_LOADED_DATA_PATH'] = os.path.join(pkg_dir, 'config/pf_parameters_loaded_data.yaml')
+os.environ['PARAMETERS_IMAGE_SELECT_PATH'] = os.path.join(pkg_dir, 'config/parameters_image_select.yaml')
+# os.environ['PARAMETERS_SAVING_DATA_PATH'] = os.path.join(pkg_dir, 'config/startup_parameters_saving_data.yaml')
+
+
+os.environ['MODEL_WEIGHT_PATH'] = os.path.join(pkg_dir, "data/best_s_500_v8.pt")
+os.environ['MODEL_WEIGHT_PATH'] = os.path.join(pkg_dir, "data/best_s_500_bi-axe_v1.pt")
+
+os.environ['MODEL_STARTUP_IMAGE_PATH'] = os.path.join(pkg_dir, "data/live_startup_image.png")
+
+
+# os.environ['LD_PRELOAD'] = '/usr/lib/x86_64-linux-gnu/libstdc++.so.6'

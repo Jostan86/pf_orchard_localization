@@ -279,27 +279,16 @@ class PfAppBase(PfMainWindow):
 
         data_file_path = self.data_file_controls.data_file_dir + data_file_name
 
-
-        if not os.path.isfile(data_file_path) and not os.path.isdir(data_file_path):
-            self.data_file_controls.set_opened("Invalid file name")
+        valid, message = self.check_data_file_is_valid(data_file_path)
+        
+        if not valid:
+            self.data_file_controls.set_opened(message)
             return
-        elif self.using_cached_data and data_file_path.endswith(".json"):
+        
+        if data_file_path.endswith(".json"):
             data_manager = CachedDataLoader(data_file_path)
-        elif os.path.isdir(data_file_path):
-            files = os.listdir(data_file_path)
-            if len(files) == 2:
-                file_endings = [file.split(".")[-1] for file in files]
-                if "yaml" in file_endings and "db3" in file_endings:
-                    data_manager = Bag2DataLoader(data_file_path, self.parameters_data.depth_topic, self.parameters_data.rgb_topic, self.parameters_data.odom_topic)
-                else:
-                    self.data_file_controls.set_opened("Invalid file type")
-                    return
-            else:
-                self.data_file_controls.set_opened("Invalid file type")
-                return
         else:
-            self.data_file_controls.set_opened("Invalid file type")
-            return
+            data_manager = Bag2DataLoader(data_file_path, self.parameters_data.depth_topic, self.parameters_data.rgb_topic, self.parameters_data.odom_topic)
 
         if data_manager.num_img_msgs == 0:
             self.data_file_open_button.set_opened("No images found in data file, check topic names")
@@ -320,7 +309,28 @@ class PfAppBase(PfMainWindow):
             self.trunk_data_connection.get_trunk_data(self.current_msg)
             self.image_number_label.set_img_number_label(self.data_manager.current_img_position,
                                                          self.data_manager.num_img_msgs)
+            
+    def check_data_file_is_valid(self, data_file_path: str):
+        """Check if a data file is valid
 
+        Args:
+            data_file_name (str): Name of the data file to check
+        """
+        if not os.path.isfile(data_file_path) and not os.path.isdir(data_file_path):
+            return False, "Invalid file name"
+        elif data_file_path.endswith(".json") and not self.using_cached_data:
+            return False, "Invalid file type, not using cached data"
+        elif data_file_path.endswith(".json") and self.using_cached_data:
+            return True, "Valid file"
+        elif os.path.isdir(data_file_path):
+            files = os.listdir(data_file_path)
+            if len(files) == 2:
+                file_endings = [file.split(".")[-1] for file in files]
+                if "yaml" in file_endings and "db3" in file_endings:
+                    return True, "Valid file"
+        else:
+            return False, "Invalid file"
+        
     def load_next_data_file(self, load_first_image=True):
         """Load the next data file in the list of data files.
 
@@ -429,6 +439,7 @@ class PfAppBags(PfAppBase):
     def setup_trunk_data_connection(self):
         self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
         self.image_display_checkbox_changed()
+        
     def init_widgets_unique(self):
         self.image_browsing_controls = ImageBrowsingControls()
         self.data_file_controls = DataFileControls(self, self.parameters_data)
@@ -457,6 +468,13 @@ class PfAppCached(PfAppBase):
     def __init__(self, config_file_path, logging_level=logging.DEBUG):
         self.using_cached_data = True
         super().__init__(config_file_path, logging_level=logging_level)
+        
+        # check if it's a file
+        if self.parameters_data.test_start_info_path is None:
+            raise FileNotFoundError("No test_start_info_path given in config file")           
+        if not os.path.isfile(self.parameters_data.test_start_info_path):
+            raise FileNotFoundError("Invalid test_start_info_path given in config file")
+            
 
         self.pf_test_controls.load_test(self.parameters_data.test_start_info_path)
 

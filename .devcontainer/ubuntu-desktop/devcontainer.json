@@ -1,5 +1,5 @@
 {
-  "name": "particle_filter_localization",
+  "name": "particle_filter_localization_ubuntu-desktop",
   "dockerFile": "Dockerfile",
   "extensions": [
     "ms-python.python",

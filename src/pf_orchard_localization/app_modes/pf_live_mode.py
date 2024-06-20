@@ -1,11 +1,11 @@
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication
-import rospy
 from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
+# import rclpy
 
 class PfLiveMode:
     def __init__(self, main_app_manager):
@@ -36,10 +36,14 @@ class PfLiveMode:
         self.depth_image_timestamps = []
 
     def connect_to_ros(self):
-        rospy.init_node('pf_live_mode', anonymous=True)
-        self.rgb_image_sub = rospy.Subscriber('/registered/rgb/image', Image, self.rgb_image_callback)
-        self.depth_image_sub = rospy.Subscriber('/registered/depth/image', Image, self.depth_image_callback)
-        self.odom_sub = rospy.Subscriber('/odometry/filtered', Odometry, self.odom_callback)
+        self.node = rclpy.create_node('pf_live_mode')
+        self.rgb_image_sub = self.node.create_subscription(Image, '/registered/rgb/image', self.rgb_image_callback, 10)
+        self.depth_image_sub = self.node.create_subscription(Image, '/registered/depth/image', self.depth_image_callback, 10)
+        self.odom_sub = self.node.create_subscription(Odometry, '/odometry/filtered', self.odom_callback, 10)
+        # rospy.init_node('pf_live_mode', anonymous=True)
+        # self.rgb_image_sub = rospy.Subscriber('/registered/rgb/image', Image, self.rgb_image_callback)
+        # self.depth_image_sub = rospy.Subscriber('/registered/depth/image', Image, self.depth_image_callback)
+        # self.odom_sub = rospy.Subscriber('/odometry/filtered', Odometry, self.odom_callback)
         # self.tree_data_pub = rospy.Publisher('/tree_data', TreeData, queue_size=10)
 
         self.ros_connected = True

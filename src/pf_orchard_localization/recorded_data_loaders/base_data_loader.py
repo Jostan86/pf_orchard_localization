@@ -59,6 +59,17 @@ class BaseDataLoader:
     def current_data_file_name(self):
         return self.current_data_file_path.split('/')[-1]
 
+    def close(self):
+        self.time_stamps = []
+        self.cur_data_pos = 0
+        self.msg_list = []
+        self.time_stamps_img = []
+        self.msg_order = []
+
+        self.current_data_file_path = None
+
+        self.reached_end_of_data = False
+        self.reached_start_of_data = True
 
     def get_next_msg(self):
         self.cur_data_pos += 1

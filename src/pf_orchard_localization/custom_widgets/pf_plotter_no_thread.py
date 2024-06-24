@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 import pyqtgraph as pg
-import time
-from PyQt6.QtCore import pyqtSignal, Qt, QPointF, QThread, pyqtSlot
+from PyQt6.QtCore import pyqtSignal, Qt, QPointF
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton
 from PyQt6.QtGui import QMouseEvent
 import numpy as np
@@ -67,8 +66,6 @@ class PFPlotter(QWidget):
         self.test_tree_numbers = map_data.test_tree_numbers
         # Set class to 2 for test trees
         self.all_class_estimates[map_data.test_tree_indexes] = 2
-        
-        self.add_nums_thread = None
 
         # Draw the map
         self.draw_plot()
@@ -78,9 +75,6 @@ class PFPlotter(QWidget):
         self.particles_save = None
 
     def toggle_show_nums(self):
-        # Check if the thread is running
-        
-        
         self.show_nums = not self.show_nums
         self.draw_plot(particles=self.particles_save)
 
@@ -95,15 +89,6 @@ class PFPlotter(QWidget):
                       91.5, 97.3]
         row_num_ys = [y - 1 for y in row_num_ys]
         row_nums = [96+i for i in range(len(row_num_xs))]
-        
-        # Add numbers to the trees if show_nums is True, which is toggled by a button in the app
-        if self.show_nums:
-            self.add_nums_thread = TextItemWorker(self.all_position_estimates, self.all_object_numbers, self.all_class_estimates, self.test_tree_numbers, row_num_xs, row_num_ys, row_nums)
-            self.add_nums_thread.text_item_ready.connect(self.add_text_item)
-            self.add_nums_thread.start()
-        else:
-            if self.add_nums_thread is not None and self.add_nums_thread.is_running:
-                self.add_nums_thread.stop()
 
         # Clear the plot widget
         self.plot_widget.clear()
@@ -124,7 +109,33 @@ class PFPlotter(QWidget):
         self.plot_widget.plot(test_tree_positions[:, 0], test_tree_positions[:, 1], pen=None, symbol='o',
                               symbolBrush=(6, 180, 233), symbolSize=self.dot_size, name='Test Trees')
 
-        
+        # Add numbers to the trees if show_nums is True, which is toggled by a button in the app
+        test_tree_idx = 0
+        if self.show_nums:
+            for i, (x, y) in enumerate(self.all_position_estimates):
+                # tree_num_text = pg.TextItem(
+                #     html='<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(
+                #             self.all_object_numbers[i]), anchor=(1.1, 0.5))
+                # tree_num_text.setPos(x, y)
+                # self.plot_widget.addItem(tree_num_text)
+
+
+                # Add test tree numbers
+                if self.all_class_estimates[i] == 2:
+                    tree_num_text = pg.TextItem(
+                        html = '<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(
+                            self.test_tree_numbers[test_tree_idx]), anchor = (-0.1, 0.5))
+                    tree_num_text.setPos(x, y)
+                    self.plot_widget.addItem(tree_num_text)
+                    test_tree_idx += 1
+
+            # Add row numbers
+            for i, (x, y) in enumerate(zip(row_num_xs, row_num_ys)):
+                row_num_text = pg.TextItem(
+                    html='<div style="text-align: center"><span style="color: #000000; font-size: 15pt;">{}</span></div>'.format(
+                        row_nums[i]), anchor=(0.5, 0.5))
+                row_num_text.setPos(x, y)
+                self.plot_widget.addItem(row_num_text)
 
         self.particle_plot_item = self.plot_widget.plot([], [], pen=None, symbol='o',
                                                         symbolBrush=(0, 0, 0), symbolSize=2, name='Particles')
@@ -136,13 +147,7 @@ class PFPlotter(QWidget):
                                                                symbolSize=0.75*self.dot_size,
                                                                name='Actual Position')
         self.update_particles(particles)
-        
-    def add_text_item(self, item):
-        if self.show_nums:
-            text_item = pg.TextItem(html=item['html'], anchor=item['anchor'])
-            text_item.setPos(item['x'], item['y'])
-            self.plot_widget.addItem(text_item)
-            
+
     def update_particles(self, particles):
         # Method to update the particles on the plot
         if particles is not None:
@@ -230,72 +235,4 @@ class TreatingPFPlotter(PFPlotter):
             self.treated_trees_plot_item.setData([complete_position[0]], [complete_position[1]])
         else:
             self.treated_trees_plot_item.setData(complete_position[:, 0], complete_position[:, 1])
-
             
-class TextItemWorker(QThread):
-    text_item_ready = pyqtSignal(dict)
-
-    def __init__(self, all_position_estimates, all_object_numbers, all_class_estimates, test_tree_numbers, row_num_xs, row_num_ys, row_nums):
-        super().__init__()
-        self.all_position_estimates = all_position_estimates
-        self.all_object_numbers = all_object_numbers
-        self.all_class_estimates = all_class_estimates
-        self.test_tree_numbers = test_tree_numbers
-        self.row_num_xs = row_num_xs
-        self.row_num_ys = row_num_ys
-        self.row_nums = row_nums
-        self.is_running = False
-
-    @pyqtSlot()
-    def run(self):
-        self.is_running = True
-        test_tree_idx = 0
-        delay_time = 0.005
-
-        for i, (x, y) in enumerate(self.all_position_estimates):
-            if not self.is_running:
-                break
-            
-            tree_num_text = {
-                'html': '<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(self.all_object_numbers[i]),
-                'x': x,
-                'y': y,
-                'anchor': (1.1, 0.5)
-            }
-            # items.append(tree_num_text)
-            self.text_item_ready.emit(tree_num_text)
-            
-
-            if self.all_class_estimates[i] == 2:
-                test_tree_text = {
-                    'html': '<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(self.test_tree_numbers[test_tree_idx]),
-                    'x': x,
-                    'y': y,
-                    'anchor': (-0.1, 0.5)
-                }
-                # items.append(test_tree_text)
-                self.text_item_ready.emit(test_tree_text)
-                test_tree_idx += 1
-            
-            time.sleep(delay_time)
-
-        for i, (x, y) in enumerate(zip(self.row_num_xs, self.row_num_ys)):
-            if not self.is_running:
-                break
-            
-            row_num_text = {
-                'html': '<div style="text-align: center"><span style="color: #000000; font-size: 15pt;">{}</span></div>'.format(self.row_nums[i]),
-                'x': x,
-                'y': y,
-                'anchor': (0.5, 0.5)
-            }
-            # items.append(row_num_text)
-            self.text_item_ready.emit(row_num_text)
-            time.sleep(delay_time)
-        
-        self.is_running = False
-    
-    def stop(self):
-        self.is_running = False
-        self.wait()
-    

@@ -16,9 +16,9 @@ cached_config_file_path = "/home/jostan/OneDrive/Docs/Grad_school/Research/code_
 
 app = QApplication(sys.argv)
 # window = MyMainWindow()
-# pf_app = PfAppBags(bag_config_file_path)
+pf_app = PfAppBags(bag_config_file_path)
 # pf_app = PfAppLive(live_config_file_path)
-pf_app = PfAppCached(cached_config_file_path)
+# pf_app = PfAppCached(cached_config_file_path)
 
 pf_app.show()
 

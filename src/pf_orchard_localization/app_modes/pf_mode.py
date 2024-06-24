@@ -101,11 +101,26 @@ class PfMode:
         while not self.main_app_manager.data_manager.at_img_msg:
             self.send_next_msg()
 
+    def enable_disable_widgets(self, enable):
+        self.main_app_manager.enable_visible_widgets(enable)
+        
+        if not enable:
+            self.main_app_manager.control_buttons.setEnabled(True)
+            self.main_app_manager.control_buttons.single_step_button.setEnabled(False)
+            self.main_app_manager.control_buttons.reset_button.setEnabled(False)
+            self.main_app_manager.console.setEnabled(True)
+            self.main_app_manager.image_display.setEnabled(True)
+            self.main_app_manager.plotter.setEnabled(True)
+            
+               
+        
     def start_pf_continuous(self):
         self.main_app_manager.control_buttons.set_stop()
-        self.main_app_manager.change_parameters_button.disable()
-        self.main_app_manager.data_file_controls.data_file_open_button.setEnabled(False)
-        self.main_app_manager.start_location_controls.disable()
+        # self.main_app_manager.change_parameters_button.disable()
+        # self.main_app_manager.data_file_controls.setEnabled(False)
+        # self.main_app_manager.start_location_controls.disable()
+        # self.main_app_manager.checkboxes.disable()
+        self.enable_disable_widgets(enable=False)
         self.pf_continuous_active = True
         self.timer = QTimer()
         self.timer.timeout.connect(self.send_next_msg)
@@ -116,9 +131,11 @@ class PfMode:
         self.pf_continuous_active = False
         self.is_processing = False
         self.main_app_manager.control_buttons.set_start()
-        self.main_app_manager.change_parameters_button.enable()
-        self.main_app_manager.data_file_controls.data_file_open_button.setEnabled(True)
-        self.main_app_manager.start_location_controls.enable()
+        # self.main_app_manager.change_parameters_button.enable()
+        # self.main_app_manager.data_file_controls.setEnabled(True)
+        # self.main_app_manager.start_location_controls.enable()
+        # self.main_app_manager.checkboxes.enable()
+        self.enable_disable_widgets(enable=True)
 
     def activate_mode(self):
         self.mode_active = True

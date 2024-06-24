@@ -1,0 +1,6 @@
+*.pyc
+*.idea
+src/pf_orchard_localization.egg-info
+build/
+dist/
+*.insyncdl

@@ -2,8 +2,8 @@ import numpy as np
 import cv2
 from typing import Callable, Optional, List
 import time
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot
+from PyQt6.QtWidgets import QApplication
 import socket
 import struct
 import pickle

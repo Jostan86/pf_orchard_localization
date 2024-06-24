@@ -4,7 +4,7 @@ import pickle
 import time
 import numpy as np
 from typing import List, Callable, Optional
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QApplication
+from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, QApplication
 from .trunk_data_connection import TrunkDataConnection
 
 class TrunkDataConnectionJetson(TrunkDataConnection):

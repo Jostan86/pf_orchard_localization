@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import sys
 from dataclasses import fields
-from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QWidget
-from PyQt5.QtGui import QSurfaceFormat
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QWidget
+from PyQt6.QtGui import QSurfaceFormat
 from ..custom_widgets import (PfMainWindow, PfControlButtons, PfStartLocationControls, PfCheckBoxes,
                               Console, ImageDisplay, PfModeSelector, ImageBrowsingControls, TreatingPFPlotter,
                               DataFileControls, DataFileTimeLine, ImageNumberLabel, ImageDelaySlider, CachedDataCreator,
@@ -45,6 +45,7 @@ class PfAppBase(PfMainWindow):
         self.pf_engine = PFEngine(self.map_data)
 
         self.init_widgets()
+        self.draw_ui()
 
         self.current_msg = None
         self.active_mode = None
@@ -86,6 +87,10 @@ class PfAppBase(PfMainWindow):
     def init_modes(self):
         """Initialize the modes for the app"""
         pass
+    
+    def draw_ui(self):
+        """Draw the user interface"""
+        pass
 
     def init_widgets(self):
         """Initialize all the widgets used in the app"""
@@ -96,7 +101,6 @@ class PfAppBase(PfMainWindow):
         self.widget_list = []
 
         self.main_layout = QHBoxLayout()
-        self.ui_layout = QVBoxLayout()
 
         # Setup widgets shared by all the app types
         self.start_location_controls = PfStartLocationControls(self)
@@ -133,8 +137,8 @@ class PfAppBase(PfMainWindow):
         # Note that ui_layout always needs to be at the end of this list or bugs will occur, or really, it needs to have
         # top level widgets added to it last
         self.widget_list += [self.start_location_controls, self.checkboxes, self.change_parameters_button,
-                            self.mode_selector, self.control_buttons, self.image_display, self.console, self.plotter,
-                             self.ui_layout]
+                            self.mode_selector, self.control_buttons, self.image_display, self.console, self.plotter,]
+                            #  self.ui_layout]
 
     def init_widgets_unique(self):
         """Initialize the widgets unique to the app type"""
@@ -159,12 +163,6 @@ class PfAppBase(PfMainWindow):
     def connect_app_to_ui_unique(self):
         """Connect the app functions unique to the app type"""
         pass
-
-    def disable_all_widgets(self):
-        """Disable all the widgets in the app"""
-        for widget in self.widget_list:
-            if widget is not None:
-                widget.setParent(None)
 
     def setup_trunk_data_connection(self):
         """Setup the object that connects the app to the trunk segmenter and analyzer"""
@@ -220,7 +218,16 @@ class PfAppBase(PfMainWindow):
     def stop_when_converged_changed(self):
         """Change the stop when converged parameter in the particle filter parameters according to the checkbox"""
         self.parameters_pf.stop_when_converged = self.checkboxes.stop_when_converged_checkbox.isChecked()
-        
+    
+    def disable_all_widgets(self):
+        """Disable all the widgets in the app"""
+        # for widget in self.widget_list:
+        #     if widget is not None:
+        #         widget.setParent(None)
+        for widget in self.widget_list:
+            if widget is not None:
+                widget.hide()
+                
     def mode_changed(self):
         """Change the active mode based on the mode selector"""
 
@@ -237,7 +244,10 @@ class PfAppBase(PfMainWindow):
                 mode.activate_mode()
                 self.active_mode = mode
                 break
-
+        
+        # add the mode names back to the mode selector
+        # self.mode_selector.set_modes(self.modes)
+        
     def data_file_time_line_edited(self):
         """Change the time the data file is at based on a time entered in the time line edit box by the user"""
 
@@ -452,7 +462,33 @@ class PfAppBags(PfAppBase):
         self.widget_list += [self.image_browsing_controls, self.data_file_controls, self.data_file_time_line,
                                 self.image_number_label, self.image_delay_slider, self.cached_data_creator, self.save_calibration_data_controls]
 
+    def draw_ui(self):
+        mode_change_button_layout = QHBoxLayout()
+        mode_change_button_layout.addWidget(self.mode_selector)
+        mode_change_button_layout.addWidget(self.change_parameters_button)
 
+        img_delay_time_line_layout = QHBoxLayout()
+        img_delay_time_line_layout.addWidget(self.data_file_time_line)
+        img_delay_time_line_layout.addWidget(self.image_delay_slider)
+
+        self.ui_layout = QVBoxLayout()
+        
+        self.ui_layout.addLayout(mode_change_button_layout)
+        self.ui_layout.addWidget(self.checkboxes)
+        self.ui_layout.addWidget(self.start_location_controls)
+        self.ui_layout.addWidget(self.control_buttons)
+        self.ui_layout.addWidget(self.image_display)
+        self.ui_layout.addWidget(self.image_number_label)
+        self.ui_layout.addWidget(self.image_browsing_controls)
+        self.ui_layout.addLayout(img_delay_time_line_layout)
+        self.ui_layout.addWidget(self.data_file_controls)
+        self.ui_layout.addWidget(self.cached_data_creator)
+        self.ui_layout.addWidget(self.save_calibration_data_controls)
+        self.ui_layout.addWidget(self.console)
+        
+        self.main_layout.addLayout(self.ui_layout)
+        self.main_layout.addWidget(self.plotter)
+        
     def connect_app_to_ui_unique(self):
         self.data_file_time_line.data_file_time_line.returnPressed.connect(self.data_file_time_line_edited)
 
@@ -496,6 +532,34 @@ class PfAppCached(PfAppBase):
 
         self.widget_list += [self.image_browsing_controls, self.data_file_controls, self.data_file_time_line,
                              self.image_number_label, self.image_delay_slider, self.cached_data_creator, self.pf_test_controls]
+    
+    def draw_ui(self):
+        mode_change_button_layout = QHBoxLayout()
+        mode_change_button_layout.addWidget(self.mode_selector)
+        mode_change_button_layout.addWidget(self.change_parameters_button)
+
+        img_delay_time_line_layout = QHBoxLayout()
+        img_delay_time_line_layout.addWidget(self.data_file_time_line)
+        img_delay_time_line_layout.addWidget(self.image_delay_slider)
+
+        self.ui_layout = QVBoxLayout()
+        
+        self.ui_layout.addLayout(mode_change_button_layout)
+        self.ui_layout.addWidget(self.checkboxes)
+        self.ui_layout.addWidget(self.start_location_controls)
+        self.ui_layout.addWidget(self.control_buttons)
+        self.ui_layout.addWidget(self.image_display)
+        self.ui_layout.addWidget(self.image_number_label)
+        self.ui_layout.addWidget(self.image_browsing_controls)
+        self.ui_layout.addLayout(img_delay_time_line_layout)
+        self.ui_layout.addWidget(self.data_file_controls)
+        self.ui_layout.addWidget(self.cached_data_creator)
+        self.ui_layout.addWidget(self.pf_test_controls)
+        self.ui_layout.addWidget(self.console)
+        
+        self.main_layout.addLayout(self.ui_layout)
+        self.main_layout.addWidget(self.plotter)
+        
     def init_modes(self):
         self.pf_tests_mode = PfModeCachedTests(self)
         self.modes.append(self.pf_tests_mode)
@@ -526,6 +590,27 @@ class PfAppLive(PfAppBase):
         self.ros_connect_button = RosConnectButton()
 
         self.widget_list += [self.queue_size_label, self.ros_connect_button]
+    
+    def draw_ui(self):
+        mode_change_button_layout = QHBoxLayout()
+        mode_change_button_layout.addWidget(self.mode_selector)
+        mode_change_button_layout.addWidget(self.change_parameters_button)
+
+        self.ui_layout = QVBoxLayout()
+        
+        self.ui_layout.addLayout(mode_change_button_layout)
+        self.ui_layout.addWidget(self.checkboxes)
+        self.ui_layout.addWidget(self.start_location_controls)
+        self.ui_layout.addWidget(self.control_buttons)
+        self.ui_layout.addWidget(self.ros_connect_button)
+        self.ui_layout.addWidget(self.queue_size_label)
+        self.ui_layout.addWidget(self.image_display)
+        self.ui_layout.addWidget(self.image_browsing_controls)
+        self.ui_layout.addWidget(self.console)
+        
+        self.main_layout.addLayout(self.ui_layout)
+        self.main_layout.addWidget(self.plotter)
+    
 
     def init_modes(self):
         self.pf_live_mode = PfLiveMode(self)

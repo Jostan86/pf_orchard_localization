@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication
 
 import time
 import numpy as np
@@ -129,27 +129,24 @@ class PfMode:
         self.main_app_manager.reset_pf()
 
     def setup_gui(self):
-        mode_change_button_layout = QHBoxLayout()
-        mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
-        mode_change_button_layout.addWidget(self.main_app_manager.change_parameters_button)
 
-        img_delay_time_line_layout = QHBoxLayout()
-        img_delay_time_line_layout.addWidget(self.main_app_manager.data_file_time_line)
-        img_delay_time_line_layout.addWidget(self.main_app_manager.image_delay_slider)
-
-        self.main_app_manager.ui_layout.addLayout(mode_change_button_layout)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.start_location_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.control_buttons)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
-        self.main_app_manager.ui_layout.addLayout(img_delay_time_line_layout)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.cached_data_creator)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
-
-        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
-        self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
+        self.main_app_manager.mode_selector.show()
+        self.main_app_manager.change_parameters_button.show()
+        
+        self.main_app_manager.data_file_time_line.show()
+        self.main_app_manager.image_delay_slider.show()
+        
+        self.main_app_manager.checkboxes.show()
+        self.main_app_manager.start_location_controls.show()
+        self.main_app_manager.control_buttons.show()
+        self.main_app_manager.image_display.show()
+        self.main_app_manager.image_number_label.show()
+        self.main_app_manager.data_file_controls.show()
+        self.main_app_manager.cached_data_creator.show()
+        self.main_app_manager.console.show()
+        
+        self.main_app_manager.plotter.show()
+        
 
     def connect_gui(self):
         self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_pf_continuous)
@@ -212,27 +209,19 @@ class PfModeCached(PfMode):
         return x_odom, theta_odom, time_stamp_odom
 
     def setup_gui(self):
-
-        mode_change_button_layout = QHBoxLayout()
-        mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
-        mode_change_button_layout.addWidget(self.main_app_manager.change_parameters_button)
-
-        img_delay_time_line_layout = QHBoxLayout()
-        img_delay_time_line_layout.addWidget(self.main_app_manager.data_file_time_line)
-        img_delay_time_line_layout.addWidget(self.main_app_manager.image_delay_slider)
-
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.mode_selector)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.start_location_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.control_buttons)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
-        self.main_app_manager.ui_layout.addLayout(img_delay_time_line_layout)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
-
-        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
-        self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
+        
+        self.main_app_manager.mode_selector.show()
+        self.main_app_manager.change_parameters_button.show()
+        self.main_app_manager.data_file_time_line.show()
+        self.main_app_manager.image_delay_slider.show()
+        self.main_app_manager.checkboxes.show()
+        self.main_app_manager.start_location_controls.show()
+        self.main_app_manager.control_buttons.show()
+        self.main_app_manager.image_display.show()
+        self.main_app_manager.image_number_label.show()
+        self.main_app_manager.data_file_controls.show()
+        self.main_app_manager.console.show()
+        self.main_app_manager.plotter.show()
 
     def connect_gui(self):
         self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_pf_continuous)
@@ -394,25 +383,19 @@ class PfModeCachedTests(PfModeCached):
             return False, distance
 
     def setup_gui(self):
-
-        mode_change_button_layout = QHBoxLayout()
-        mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
-        mode_change_button_layout.addWidget(self.main_app_manager.change_parameters_button)
-
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.mode_selector)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.pf_test_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_time_line)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
-
-        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
-        self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
+        
+        self.main_app_manager.mode_selector.show()
+        self.main_app_manager.change_parameters_button.show()
+        self.main_app_manager.checkboxes.show()
+        self.main_app_manager.image_display.show()
+        self.main_app_manager.image_number_label.show()
+        self.main_app_manager.pf_test_controls.show()
+        self.main_app_manager.data_file_time_line.show()
+        self.main_app_manager.data_file_controls.show()
+        self.main_app_manager.console.show()
+        self.main_app_manager.plotter.show()
 
         self.main_app_manager.data_file_controls.disable()
-        #TODO: see if this works or needs to be changed to setReadOnly
         self.main_app_manager.data_file_time_line.disable()
 
     def connect_gui(self):
@@ -450,27 +433,21 @@ class PfModeSaveCalibrationData(PfMode):
         self.mode_name = "PF - Save Calibration Data"
 
     def setup_gui(self):
-        mode_change_button_layout = QHBoxLayout()
-        mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
-        mode_change_button_layout.addWidget(self.main_app_manager.change_parameters_button)
-
-        img_delay_time_line_layout = QHBoxLayout()
-        img_delay_time_line_layout.addWidget(self.main_app_manager.data_file_time_line)
-        img_delay_time_line_layout.addWidget(self.main_app_manager.image_delay_slider)
-
-        self.main_app_manager.ui_layout.addLayout(mode_change_button_layout)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.start_location_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.control_buttons)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
-        self.main_app_manager.ui_layout.addLayout(img_delay_time_line_layout)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.save_calibration_data_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
-
-        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
-        self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
+        
+        self.main_app_manager.mode_selector.show()
+        self.main_app_manager.change_parameters_button.show()
+        self.main_app_manager.data_file_time_line.show()
+        self.main_app_manager.image_delay_slider.show()
+        self.main_app_manager.checkboxes.show()
+        self.main_app_manager.start_location_controls.show()
+        self.main_app_manager.control_buttons.show()
+        self.main_app_manager.image_display.show()
+        self.main_app_manager.image_number_label.show()
+        self.main_app_manager.data_file_controls.show()
+        self.main_app_manager.save_calibration_data_controls.show()
+        self.main_app_manager.console.show()
+        self.main_app_manager.plotter.show()
+                
 
     # def connect_gui(self):
     #     super().connect_gui()

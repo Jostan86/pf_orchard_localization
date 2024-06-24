@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication
 from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from cv_bridge import CvBridge
@@ -242,21 +242,17 @@ class PfLiveMode:
         self.main_app_manager.reset_pf()
 
     def setup_gui(self):
-        mode_change_button_layout = QHBoxLayout()
-        mode_change_button_layout.addWidget(self.main_app_manager.mode_selector)
-        mode_change_button_layout.addWidget(self.main_app_manager.change_parameters_button)
-
-        self.main_app_manager.ui_layout.addLayout(mode_change_button_layout)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.start_location_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.ros_connect_button)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.control_buttons)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.queue_size_label)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
-
-        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
-        self.main_app_manager.main_layout.addWidget(self.main_app_manager.plotter)
+        
+        self.main_app_manager.mode_selector.show()
+        self.main_app_manager.change_parameters_button.show()
+        self.main_app_manager.checkboxes.show()
+        self.main_app_manager.start_location_controls.show()
+        self.main_app_manager.ros_connect_button.show()
+        self.main_app_manager.control_buttons.show()
+        self.main_app_manager.queue_size_label.show()
+        self.main_app_manager.image_display.show()
+        self.main_app_manager.console.show()
+        self.main_app_manager.plotter.show()
 
     def connect_gui(self):
         self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_pf_continuous)

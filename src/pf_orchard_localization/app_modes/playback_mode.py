@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QHBoxLayout
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QHBoxLayout
 import os
 import cv2
 
@@ -96,21 +96,16 @@ class PlaybackMode:
 
     def activate_mode(self):
         self.mode_active = True
-
-        img_delay_time_line_layout = QHBoxLayout()
-        img_delay_time_line_layout.addWidget(self.main_app_manager.data_file_time_line)
-        img_delay_time_line_layout.addWidget(self.main_app_manager.image_delay_slider)
-
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.mode_selector)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.checkboxes)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_display)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_number_label)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.image_browsing_controls)
-        self.main_app_manager.ui_layout.addLayout(img_delay_time_line_layout)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.data_file_controls)
-        self.main_app_manager.ui_layout.addWidget(self.main_app_manager.console)
-
-        self.main_app_manager.main_layout.addLayout(self.main_app_manager.ui_layout)
+        
+        self.main_app_manager.data_file_time_line.show()
+        self.main_app_manager.image_delay_slider.show()
+        self.main_app_manager.mode_selector.show()
+        self.main_app_manager.checkboxes.show()
+        self.main_app_manager.image_display.show()
+        self.main_app_manager.image_number_label.show()
+        self.main_app_manager.image_browsing_controls.show()
+        self.main_app_manager.data_file_controls.show()
+        self.main_app_manager.console.show()
 
         self.next_button_clicked()
 

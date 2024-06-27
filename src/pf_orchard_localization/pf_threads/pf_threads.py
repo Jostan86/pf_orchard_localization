@@ -1,11 +1,10 @@
 from ..utils.pf_evaluation import PfTestExecutor
-from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition
 import numpy as np
 import time
 from ..utils.parameters import ParametersPf
 from ..pf_engine import PFEngine
 import inspect
-
 
 class PfBagThread(QThread):
     
@@ -19,22 +18,31 @@ class PfBagThread(QThread):
     
     
     def __init__(self, 
-                 pf_engine, 
+                 pf_engine: PFEngine, 
                  data_manager, 
-                 get_trunk_data_func, 
+                 trunk_data_thread, 
                  stop_when_converged, 
                  only_single_image, 
                  added_delay, 
                  cache_data_enabled=False):
         
+        super().__init__()
+        
         self.pf_engine = pf_engine
         self.data_manager = data_manager
         self.cache_data_enabled = cache_data_enabled
-        self.get_trunk_data = get_trunk_data_func
+        self.trunk_data_thread = trunk_data_thread
         self.stop_when_converged = stop_when_converged
         self.only_single_image = only_single_image
         self.added_delay = added_delay
         
+        self.trunk_data_thread.signal_request_processed.connect(self.on_request_processed)
+        
+        self.trunk_data = None
+
+
+        self.mutex = QMutex()
+        self.condition = QWaitCondition()
         
         self.is_processing = False
         self.pf_active = False
@@ -42,7 +50,7 @@ class PfBagThread(QThread):
         self.load_data_success = False
         self.recieved_data_manager = False
         
-        super().__init__()
+        
         
     def get_new_data_manager(self):
         self.recieved_data_manager = False
@@ -85,7 +93,7 @@ class PfBagThread(QThread):
             self.is_processing = True 
             self.send_next_msg()
             self.is_processing = False
-            time.sleep(self.added_delay)
+            self.msleep(int(self.added_delay * 1000))
             
             
             if self.pf_active:
@@ -116,7 +124,15 @@ class PfBagThread(QThread):
         self.is_processing = False
 
     def get_data_from_image_msg(self, current_msg):        
-        positions, widths, class_estimates, seg_img = self.get_trunk_data(current_msg, return_seg_img=True)
+        
+        request = {"current_msg": current_msg}
+        self.trunk_data_thread.handle_request(request)
+        
+        self.trunk_data = None
+        
+        self.wait_for_response()
+        
+        positions, widths, class_estimates, seg_img = self.trunk_data
 
        
         if positions is None:
@@ -141,7 +157,20 @@ class PfBagThread(QThread):
             self.cache_msg.emit(data)
                     
         self.check_convergence()
-
+        
+    def wait_for_response(self):
+            self.mutex.lock()
+            if self.trunk_data is None:
+                self.condition.wait(self.mutex)
+            self.mutex.unlock()
+    
+    @pyqtSlot(object)
+    def on_request_processed(self, trunk_data):
+        self.mutex.lock()
+        self.trunk_data = trunk_data
+        self.condition.wakeAll()
+        self.mutex.unlock()
+        
     def get_odom_data(self, current_msg):
         odom_data = current_msg['data']
         x_odom = odom_data.twist.twist.linear.x
@@ -165,9 +194,6 @@ class PfBagThread(QThread):
         self.pf_active = False
         self.is_processing = False
     
-
-        
-        
 class PfCachedThread(PfBagThread):
     
     def get_new_data_manager(self):

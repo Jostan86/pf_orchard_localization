@@ -134,7 +134,8 @@ class DataFileControls(QWidget):
 
         # Update the app with the message from the new time stamp and set the time line to match the exact time stamp of the message
         if current_msg is not None:
-            self.set_image_display.emit(current_msg)
+            self.set_image_display.emit({"current_msg": current_msg, "for_display_only": True})
+            
             self.set_time_line(self.data_manager.current_data_file_time_stamp)
         
         self.reset_pf.emit(True)
@@ -202,7 +203,7 @@ class DataFileControls(QWidget):
 
         if load_first_image:
             current_msg = self.data_manager.get_next_img_msg()
-            self.set_image_display.emit(current_msg)
+            self.set_image_display.emit({"current_msg": current_msg, "for_display_only": True})
             self.set_img_number_label.emit(self.data_manager.current_img_position, self.data_manager.num_img_msgs)
             
     

@@ -2,41 +2,54 @@ import numpy as np
 import cv2
 from typing import Callable, Optional, List
 import time
-from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, QObject
+from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, QObject, QMutex, QWaitCondition
 from PyQt6.QtWidgets import QApplication
 import socket
 import struct
 import pickle
 import copy
 
+# Function to only import these if they're needed
 def import_trunk_analyzer(width_estimation_config_file_path):
     from trunk_width_estimation import TrunkAnalyzer, TrunkSegmenter, PackagePaths
     return TrunkAnalyzer(PackagePaths(), combine_segmenter=False), TrunkSegmenter(PackagePaths())
 
 # class for trunk data connection
-class TrunkDataConnection(QObject):
+class TrunkDataConnection(QThread):
     
     signal_save_calibration_data = pyqtSignal(dict)
+    signal_request_processed = pyqtSignal(object)
+    signal_segmented_image = pyqtSignal(object, int)
+    signal_unfiltered_image = pyqtSignal(object, int)
+    signal_original_image = pyqtSignal(object, int)
+    signal_print_message = pyqtSignal(str)
     
     def __init__(self,
                  width_estimation_config_file_path: str = None,
-                 seg_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
-                 pre_filtered_segmentation_display_func: Callable[[Optional[np.ndarray]], None] = None,
-                 original_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
+                #  seg_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
+                #  pre_filtered_segmentation_display_func: Callable[[Optional[np.ndarray]], None] = None,
+                #  original_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
-                 message_printer: Callable[[List[str]], None] = None,
-                 emitting_save_calibration_data=False):
+                #  message_printer: Callable[[List[str]], None] = None,
+                #  emitting_save_calibration_data=False
+                 ):
 
         self.init_trunk_analyzer(width_estimation_config_file_path)
 
         self.class_mapping = class_mapping
-        self.seg_image_display_func = seg_image_display_func
-        self.pre_filtered_segmentation_display_func = pre_filtered_segmentation_display_func
-        self.original_image_display_func = original_image_display_func
+        # self.seg_image_display_func = seg_image_display_func
+        # self.pre_filtered_segmentation_display_func = pre_filtered_segmentation_display_func
+        # self.original_image_display_func = original_image_display_func
         self.offset = offset
-        self.message_printer = message_printer
-
+        # self.message_printer = message_printer
+        
+        self.original_image_display_num = -1
+        self.unfiltered_image_display_num = -1
+        self.segmented_image_display_num = -1
+        
+        self.emitting_save_calibration_data = False
+        
         self.positions = None
         self.widths = None
         self.class_estimates = None
@@ -44,19 +57,49 @@ class TrunkDataConnection(QObject):
         self.x_positions_in_image = None
         self.results_kept = None
         
-        self.emitting_save_calibration_data = emitting_save_calibration_data
+        self.current_msg = None
+        
+        
+        self.wait_condition = QWaitCondition()
+        self.mutex = QMutex()
         
         super().__init__()
+    
+    def run(self):
+        while True:
+            self.mutex.lock()
+            self.wait_condition.wait(self.mutex)
+            if self.current_msg is not None:
+                result = self.get_trunk_data(self.current_msg, return_seg_img=True)
+                
+                if not self.for_display_only:
+                    self.signal_request_processed.emit(result)
+                    
+                self.current_msg = None
+            self.mutex.unlock()
+    
+    @pyqtSlot(dict)
+    def handle_request(self, request_data):
+        self.mutex.lock()
+        self.current_msg = request_data["current_msg"]
+        
+        if "for_display_only" in request_data:
+            self.for_display_only = request_data["for_display_only"]
+        else:
+            self.for_display_only = False
+        
+        self.wait_condition.wakeAll()
+        self.mutex.unlock()
         
     def init_trunk_analyzer(self, width_estimation_config_file_path):
         if width_estimation_config_file_path is not None:
             self.trunk_analyzer, self.trunk_segmenter = import_trunk_analyzer(width_estimation_config_file_path)
 
-    @pyqtSlot(dict)
+
     def get_trunk_data(self, current_msg, return_seg_img=False):
         results_dict, results = self.trunk_segmenter.get_results(current_msg['rgb_image'])
 
-        if self.pre_filtered_segmentation_display_func is not None:
+        if self.unfiltered_image_display_num != -1:
             seg_img_og = results.plot()
         else:
             seg_img_og = None
@@ -66,14 +109,14 @@ class TrunkDataConnection(QObject):
         if self.seg_img is None:
             self.seg_img = current_msg['rgb_image']
 
-        if self.original_image_display_func is not None:
-            self.original_image_display_func(current_msg['rgb_image'])
+        if self.original_image_display_num != -1:
+            self.signal_original_image.emit(current_msg['rgb_image'], self.original_image_display_num)
 
-        if self.pre_filtered_segmentation_display_func is not None:
-            self.pre_filtered_segmentation_display_func(seg_img_og)
-
-        if self.seg_image_display_func is not None:
-            self.seg_image_display_func(self.seg_img)
+        if self.unfiltered_image_display_num != -1:
+            self.signal_unfiltered_image.emit(seg_img_og, self.unfiltered_image_display_num)
+            
+        if self.segmented_image_display_num != -1:
+            self.signal_segmented_image.emit(self.seg_img, self.segmented_image_display_num)
 
         if not return_seg_img:
             return self.positions, self.widths, self.class_estimates
@@ -98,7 +141,6 @@ class TrunkDataConnection(QObject):
         if self.class_estimates is not None:
             self.class_estimates = self.remap_classes(self.class_estimates)
     
-    
     def remap_classes(self, class_estimates):
         class_estimates_copy = class_estimates.copy()
         for i, class_num in enumerate(self.class_mapping):
@@ -119,12 +161,27 @@ class TrunkDataConnection(QObject):
             msg_str += "(" + str(round(position[0], 3)) + ", " + str(round(position[1], 3)) + ") "
         messages.append(msg_str)
         messages.append("---")
-
-        if self.message_printer is not None:
-            self.message_printer(messages)
+        
+        message = "\n".join(messages)
+        self.signal_print_message.emit(message)
+            
     
     def set_emitting_save_calibration_data(self, emitting_save_calibration_data):
         self.emitting_save_calibration_data = emitting_save_calibration_data
+
+    @pyqtSlot(int)
+    def set_segmented_image_display_num(self, segmented_image_display_num):
+        self.segmented_image_display_num = segmented_image_display_num
+    
+    @pyqtSlot(int)
+    def set_unfiltered_image_display_num(self, unfiltered_image_display_num):
+        self.unfiltered_image_display_num = unfiltered_image_display_num
+    
+    @pyqtSlot(int)
+    def set_original_image_display_num(self, original_image_display_num):
+        self.original_image_display_num = original_image_display_num
+
+    
 
 
 class TrunkDataConnectionCachedData(TrunkDataConnection):

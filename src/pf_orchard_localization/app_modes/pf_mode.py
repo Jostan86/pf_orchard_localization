@@ -60,7 +60,7 @@ class PfMode(QObject):
 
         self.pf_thread = PfBagThread(pf_engine=self.main_app_manager.pf_engine,
                                      data_manager=self.main_app_manager.data_file_controls.data_manager,
-                                     get_trunk_data_func=self.main_app_manager.trunk_data_connection.get_trunk_data,
+                                     trunk_data_thread=self.main_app_manager.trunk_data_connection,
                                      stop_when_converged=self.main_app_manager.parameters_pf.stop_when_converged,
                                      only_single_image=single_image,
                                      added_delay=self.main_app_manager.image_delay_slider.get_delay_ms()/1000,

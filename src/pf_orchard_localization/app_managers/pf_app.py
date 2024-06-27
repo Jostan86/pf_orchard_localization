@@ -51,10 +51,10 @@ class PfAppBase(PfMainWindow):
         self.current_msg = None
         self.active_mode = None
 
-        self.connect_app_to_ui()
-
         self.setup_trunk_data_connection()
-
+        
+        self.connect_app_to_ui()
+        
         self.init_loaded_data()
 
         self.modes = []
@@ -160,6 +160,16 @@ class PfAppBase(PfMainWindow):
         self.checkboxes.stop_when_converged_checkbox.stateChanged.connect(self.stop_when_converged_changed)
 
         self.mode_selector.mode_selector.currentIndexChanged.connect(self.mode_changed)
+        
+        
+        
+        self.trunk_data_connection.signal_segmented_image.connect(self.image_display.load_image)
+        self.trunk_data_connection.signal_unfiltered_image.connect(self.image_display.load_image)
+        self.trunk_data_connection.signal_original_image.connect(self.image_display.load_image)
+        self.trunk_data_connection.signal_print_message.connect(self.print_message)
+        
+        self.data_file_controls.set_image_display.connect(self.trunk_data_connection.handle_request)
+        
 
         self.connect_app_to_ui_unique()
 
@@ -199,20 +209,24 @@ class PfAppBase(PfMainWindow):
         # Tell the trunk_data_connection object where to display the images
         display_num = 0
         if show_rgb_image:
-            self.trunk_data_connection.original_image_display_func = partial(self.image_display.load_image, img_num=display_num)
+            # self.trunk_data_connection.original_image_display_func = partial(self.image_display.load_image, img_num=display_num)
+            self.trunk_data_connection.set_original_image_display_num(display_num)
             display_num += 1
         else:
-            self.trunk_data_connection.original_image_display_func = None
+            self.trunk_data_connection.set_original_image_display_num(-1)
         if show_pre_filtered_segmentation:
-            self.trunk_data_connection.pre_filtered_segmentation_display_func = partial(self.image_display.load_image, img_num=display_num)
+            # self.trunk_data_connection.pre_filtered_segmentation_display_func = partial(self.image_display.load_image, img_num=display_num)
+            self.trunk_data_connection.set_unfiltered_image_display_num(display_num)
             display_num += 1
         else:
-            self.trunk_data_connection.pre_filtered_segmentation_display_func = None
-        self.trunk_data_connection.seg_image_display_func = partial(self.image_display.load_image, img_num=display_num)
+            self.trunk_data_connection.set_unfiltered_image_display_num(-1)
+        # self.trunk_data_connection.seg_image_display_func = partial(self.image_display.load_image, img_num=display_num)
+        self.trunk_data_connection.set_segmented_image_display_num(display_num)
 
         # Update the image display with the current image if there is one
         if self.current_msg is not None:
-            self.trunk_data_connection.get_trunk_data(self.current_msg)
+            request = {"current_msg": self.current_msg, "for_display_only": True}
+            self.trunk_data_connection.handle_request(request)
 
     def include_width_changed(self):
         """Change the include width parameter in the particle filter parameters according to the checkbox"""
@@ -457,8 +471,8 @@ class PfAppBags(PfAppBase):
 
     def setup_trunk_data_connection(self):
         self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
+        self.trunk_data_connection.start()
         self.image_display_checkbox_changed()
-        self.data_file_controls.set_image_display.connect(self.trunk_data_connection.get_trunk_data)
         
     def init_widgets_unique(self):
         self.image_browsing_controls = ImageBrowsingControls()

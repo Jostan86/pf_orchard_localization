@@ -2,18 +2,22 @@ import numpy as np
 import cv2
 from typing import Callable, Optional, List
 import time
-from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, QObject
 from PyQt6.QtWidgets import QApplication
 import socket
 import struct
 import pickle
+import copy
 
 def import_trunk_analyzer(width_estimation_config_file_path):
     from trunk_width_estimation import TrunkAnalyzer, TrunkSegmenter, PackagePaths
     return TrunkAnalyzer(PackagePaths(), combine_segmenter=False), TrunkSegmenter(PackagePaths())
 
 # class for trunk data connection
-class TrunkDataConnection:
+class TrunkDataConnection(QObject):
+    
+    signal_save_calibration_data = pyqtSignal(dict)
+    
     def __init__(self,
                  width_estimation_config_file_path: str = None,
                  seg_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
@@ -21,7 +25,8 @@ class TrunkDataConnection:
                  original_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
-                 message_printer: Callable[[List[str]], None] = None):
+                 message_printer: Callable[[List[str]], None] = None,
+                 emitting_save_calibration_data=False):
 
         self.init_trunk_analyzer(width_estimation_config_file_path)
 
@@ -38,10 +43,16 @@ class TrunkDataConnection:
         self.seg_img = None
         self.x_positions_in_image = None
         self.results_kept = None
+        
+        self.emitting_save_calibration_data = emitting_save_calibration_data
+        
+        super().__init__()
+        
     def init_trunk_analyzer(self, width_estimation_config_file_path):
         if width_estimation_config_file_path is not None:
             self.trunk_analyzer, self.trunk_segmenter = import_trunk_analyzer(width_estimation_config_file_path)
 
+    @pyqtSlot(dict)
     def get_trunk_data(self, current_msg, return_seg_img=False):
         results_dict, results = self.trunk_segmenter.get_results(current_msg['rgb_image'])
 
@@ -74,6 +85,11 @@ class TrunkDataConnection:
         self.positions, self.widths, self.class_estimates, self.x_positions_in_image, self.results_kept = (
             self.trunk_analyzer.pf_helper(current_msg['depth_image'], results_dict=results_dict))
 
+        if self.emitting_save_calibration_data:
+            calibration_data = copy.deepcopy(current_msg)
+            calibration_data['x_positions_in_image'] = copy.deepcopy(self.x_positions_in_image)
+            self.signal_save_calibration_data.emit(calibration_data)
+                                            
         if self.results_kept is not None:
             self.seg_img = results[self.results_kept].plot()
         else:
@@ -81,7 +97,8 @@ class TrunkDataConnection:
 
         if self.class_estimates is not None:
             self.class_estimates = self.remap_classes(self.class_estimates)
-
+    
+    
     def remap_classes(self, class_estimates):
         class_estimates_copy = class_estimates.copy()
         for i, class_num in enumerate(self.class_mapping):
@@ -105,6 +122,9 @@ class TrunkDataConnection:
 
         if self.message_printer is not None:
             self.message_printer(messages)
+    
+    def set_emitting_save_calibration_data(self, emitting_save_calibration_data):
+        self.emitting_save_calibration_data = emitting_save_calibration_data
 
 
 class TrunkDataConnectionCachedData(TrunkDataConnection):
@@ -122,7 +142,7 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
 
         self.cached_img_directory = cached_img_directory
 
-    def get_trunk_data(self, current_msg, return_seg_img=False):
+    def get_trunk_data(self, current_msg, return_seg_img=True):
 
         if current_msg['data'] is None:
             return None, None, None
@@ -132,6 +152,7 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
         self.widths = np.array(msg_data['widths'])
         self.class_estimates = np.array(msg_data['classes'], dtype=np.int32)
 
+        
         self.seg_img = self.load_cached_img(current_msg['timestamp'])
 
         if self.seg_img is not None and self.seg_image_display_func is not None:

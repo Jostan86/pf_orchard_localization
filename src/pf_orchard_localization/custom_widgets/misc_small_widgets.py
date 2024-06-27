@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QWid
                              QPlainTextEdit, QMainWindow, QComboBox, QFileDialog, QInputDialog, QDialog, QSlider,
                              QListWidget, QMessageBox, QSpinBox)
 from PyQt6.QtGui import QImage, QPixmap, QGuiApplication
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 import math
 import cv2
 import numpy as np
@@ -130,10 +130,11 @@ class PfControlButtons(QWidget):
 
     def set_num_particles(self, num_particles):
         self.num_particles_label.setText(str(num_particles))
+        
     def start_stop_button_clicked(self):
         if self.start_stop_button.text() == "Start":
             self.startButtonClicked.emit()
-        else:
+        elif self.start_stop_button.text() == "Stop":
             self.stopButtonClicked.emit()
 
     def disable(self):
@@ -257,23 +258,14 @@ class PfStartLocationControls(QWidget):
             self.main_app_manager.print_message("Shift click to set particle start position")
 
 
-    def disable(self):
-        self.start_x_input.setReadOnly(True)
-        self.start_y_input.setReadOnly(True)
-        self.rotation_input.setReadOnly(True)
-        self.orientation_center_input.setReadOnly(True)
-        self.orientation_range_input.setReadOnly(True)
-        self.start_width_input.setReadOnly(True)
-        self.start_height_input.setReadOnly(True)
-
-    def enable(self):
-        self.start_x_input.setReadOnly(False)
-        self.start_y_input.setReadOnly(False)
-        self.rotation_input.setReadOnly(False)
-        self.orientation_center_input.setReadOnly(False)
-        self.orientation_range_input.setReadOnly(False)
-        self.start_width_input.setReadOnly(False)
-        self.start_height_input.setReadOnly(False)
+    def setReadOnly(self, read_only=True):
+        self.start_x_input.setReadOnly(read_only)
+        self.start_y_input.setReadOnly(read_only)
+        self.rotation_input.setReadOnly(read_only)
+        self.orientation_center_input.setReadOnly(read_only)
+        self.orientation_range_input.setReadOnly(read_only)
+        self.start_width_input.setReadOnly(read_only)
+        self.start_height_input.setReadOnly(read_only)
 
 class PfCheckBoxes(QWidget):
     def __init__(self):
@@ -445,7 +437,8 @@ class PfModeSelector(QWidget):
 
 
 class ImageBrowsingControls(QWidget):
-    playButtonClicked = pyqtSignal(str)
+    playButtonClicked = pyqtSignal()
+    stopButtonClicked = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -483,12 +476,23 @@ class ImageBrowsingControls(QWidget):
 
         self.setLayout(self.overall_layout)
 
-        self.play_fwd_button.clicked.connect(self.emit_play_button_clicked)
+        self.play_fwd_button.clicked.connect(self.play_button_clicked)
         self.save_location_change_button.clicked.connect(self.change_save_location)
 
-    def emit_play_button_clicked(self):
-        command = self.play_fwd_button.text()
-        self.playButtonClicked.emit(command)
+    def set_playing(self, playing: bool):
+        if playing:
+            self.play_fwd_button.setText("Stop")
+        else:
+            self.play_fwd_button.setText("Play")
+        self.previous_button.setDisabled(playing)
+        self.next_button.setDisabled(playing)
+        self.save_button.setDisabled(playing)
+        
+    def play_button_clicked(self):
+        if self.play_fwd_button.text() == "Play":
+            self.playButtonClicked.emit()
+        else:
+            self.stopButtonClicked.emit()
 
     def change_save_location(self):
         save_location = QFileDialog.getExistingDirectory(self, "Select Save Location") + "/"
@@ -510,33 +514,33 @@ class ImageBrowsingControls(QWidget):
         self.play_fwd_button.setDisabled(False)
         self.save_button.setDisabled(False)
 
-class DataFileTimeLine(QWidget):
-    def __init__(self):
-        super().__init__()
+# class DataFileTimeLine(QWidget):
+#     def __init__(self):
+#         super().__init__()
 
-        self.data_file_time_line = QLineEdit()
-        self.data_file_time_line.setFixedWidth(150)
+#         self.data_file_time_line = QLineEdit()
+#         self.data_file_time_line.setFixedWidth(150)
 
-        label = QLabel("Current Data File Time:")
-        label.setFixedWidth(175)
+#         label = QLabel("Current Data File Time:")
+#         label.setFixedWidth(175)
 
-        self.data_file_time_line_layout = QHBoxLayout()
-        self.data_file_time_line_layout.addWidget(label)
-        self.data_file_time_line_layout.addWidget(self.data_file_time_line)
+#         self.data_file_time_line_layout = QHBoxLayout()
+#         self.data_file_time_line_layout.addWidget(label)
+#         self.data_file_time_line_layout.addWidget(self.data_file_time_line)
 
-        self.setFixedWidth(350)
+#         self.setFixedWidth(350)
 
-        self.setLayout(self.data_file_time_line_layout)
+#         self.setLayout(self.data_file_time_line_layout)
 
-    def set_time_line(self, time_stamp: float):
-        time_stamp = round(time_stamp, 2)
-        self.data_file_time_line.setText(str(time_stamp))
+#     def set_time_line(self, time_stamp: float):
+#         time_stamp = round(time_stamp, 2)
+#         self.data_file_time_line.setText(str(time_stamp))
 
-    def disable(self):
-        self.data_file_time_line.setDisabled(True)
+#     def disable(self):
+#         self.data_file_time_line.setDisabled(True)
 
-    def enable(self):
-        self.data_file_time_line.setDisabled(False)
+#     def enable(self):
+#         self.data_file_time_line.setDisabled(False)
 
 class ImageNumberLabel(QWidget):
     def __init__(self):
@@ -550,6 +554,7 @@ class ImageNumberLabel(QWidget):
 
         self.setLayout(self.img_number_layout)
 
+    @pyqtSlot(int, int)
     def set_img_number_label(self, img_number, total_imgs):
         self.img_number_label.setText("Image " + str(img_number) + " of " + str(total_imgs))
 
@@ -565,7 +570,7 @@ class ImageDelaySlider(QWidget):
 
         label = QLabel("Delay Between Images:")
 
-        start_value_ms = 50
+        start_value_ms = 0
 
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setMinimum(0)
@@ -576,10 +581,10 @@ class ImageDelaySlider(QWidget):
 
         self.value_label = QLabel(str(start_value_ms) + " ms")
 
-        label.setFixedWidth(175)
-        self.slider.setFixedWidth(200)
+        label.setFixedWidth(170)
+        self.slider.setFixedWidth(150)
         self.value_label.setFixedWidth(60)
-        self.setFixedWidth(465)
+        self.setFixedWidth(410)
 
         self.slider_layout = QHBoxLayout()
         self.slider_layout.addWidget(label)
@@ -753,6 +758,19 @@ class CachedDataCreator(QWidget):
 
     def get_timestamp_str(self, time_stamp):
         return str(time_stamp*1000).split(".")[0]
+    
+    @pyqtSlot(dict)
+    def cache_data(self, msg):
+        if msg['topic'] == "odom":
+            self.cache_odom_data(msg['x_odom'], msg['theta_odom'], msg['time_stamp'])
+            
+        elif msg['topic'] == "image":
+            self.cache_tree_data(msg['positions'], msg['widths'], msg['class_estimates'], msg['location_estimate'], msg['time_stamp'])
+            
+            if self.save_images_checkbox.isChecked() and msg['image'] is not None:
+                self.save_image(msg['image'], msg['time_stamp'])
+                
+    
     def cache_odom_data(self, x_odom, theta_odom, time_stamp_odom):
         self.cache[self.get_timestamp_str(time_stamp_odom)] = {"x_odom": x_odom, "theta_odom": theta_odom, "time_stamp": time_stamp_odom}
         self.cache_size_label.setText("Cache Size: " + str(len(self.cache)) + " messages")
@@ -833,6 +851,10 @@ class CachedDataCreator(QWidget):
         self.file_name_input.setDisabled(disabled)
         self.save_button.setDisabled(disabled)
         self.reset_cache_button.setDisabled(disabled)
+        self.cache_size_label.setDisabled(disabled)
+        self.file_name_label.setDisabled(disabled)
+        self.save_label.setDisabled(disabled)
+        
 
     def enable (self):
         self.enable_checkbox.setDisabled(False)
@@ -896,13 +918,17 @@ class CalibrationDataControls(QWidget):
         self.setLayout(self.main_layout)
 
         self.change_save_location_button.clicked.connect(self.change_save_location)
-
-
-
+        self.save_data_checkbox.stateChanged.connect(self.save_data_checkbox_changed)
+        
+        
+        self.image_x_positions = None
         self.previous_x_position_in_image = None
+        
 
+    @pyqtSlot(dict)
     def save_data(self, current_msg):
-        x_positions_in_image = self.main_app_manager.trunk_data_connection.x_positions_in_image
+        
+        x_positions_in_image = current_msg["x_positions_in_image"]
 
         if x_positions_in_image is None:
             self.main_app_manager.print_message("No trunk data available")
@@ -1014,7 +1040,10 @@ class CalibrationDataControls(QWidget):
 
         return closest_objects, kept_idx
 
-
+    @pyqtSlot(dict, object)
+    def receive_img_x_position(self, x_position):
+        self.image_x_positions = x_position
+        
     @property
     def save_data_enabled(self):
         return self.save_data_checkbox.isChecked()
@@ -1023,50 +1052,26 @@ class CalibrationDataControls(QWidget):
         save_location = QFileDialog.getExistingDirectory(self, "Select Save Location") + "/"
         self.save_location_input.setText(save_location)
 
-    def disable(self):
-        self.save_data_checkbox.setDisabled(True)
-        self.save_location_input.setDisabled(True)
-        self.change_save_location_button.setDisabled(True)
-        self.tree_number_input.setDisabled(True)
-        self.data_note_input.setDisabled(True)
-        self.date_edit.setDisabled(True)
+    def set_running(self, running):
+        self.save_data_checkbox.setDisabled(running)
+        self.save_location_input.setDisabled(running)
+        self.change_save_location_button.setDisabled(running)
+        self.data_note_input.setDisabled(running)
+        self.date_edit.setDisabled(running)
+    
+    def hide(self):
+        self.save_data_checkbox.setChecked(False)
+        super().hide()
 
-    def enable(self):
-        self.save_data_checkbox.setDisabled(False)
-        self.save_location_input.setDisabled(False)
-        self.change_save_location_button.setDisabled(False)
-        self.tree_number_input.setDisabled(False)
-        self.data_note_input.setDisabled(False)
-        self.date_edit.setDisabled(False)
-
-class MultiTrunkDialog(QDialog):
-    def __init__(self, x_positions_in_image):
-        super().__init__()
-
-        self.x_positions_in_image = x_positions_in_image
-
-        self.setWindowTitle("Select Trunk")
-        self.layout = QVBoxLayout()
-
-        self.trunk_buttons = []
-        for i, x_position in enumerate(x_positions_in_image):
-            button = QPushButton("Trunk " + str(i+1))
-            button.clicked.connect(self.trunk_button_clicked)
-            self.trunk_buttons.append(button)
-            self.layout.addWidget(button)
-
-        self.setLayout(self.layout)
-
-    def trunk_button_clicked(self):
-        button = self.sender()
-        self.selected_trunk = self.trunk_buttons.index(button)
-        self.accept()
-
-    def get_selected_trunk(self):
-        return self.selected_trunk
-
-
-
+    @pyqtSlot(int)
+    def save_data_checkbox_changed(self, check_state):
+        
+        checked = self.save_data_checkbox.isChecked()
+                    
+        if checked:
+            self.main_app_manager.trunk_data_connection.set_emitting_save_calibration_data(True)
+        else:
+            self.main_app_manager.trunk_data_connection.set_emitting_save_calibration_data(False)
 
 
 

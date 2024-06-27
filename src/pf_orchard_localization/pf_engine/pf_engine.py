@@ -8,7 +8,7 @@ from map_data_tools import MapData
 class PFEngine:
 
     def __init__(self, map_data: MapData, random_seed=None) -> None:
-
+        
         np.random.seed(random_seed)
 
         # Save the tree positions and widths

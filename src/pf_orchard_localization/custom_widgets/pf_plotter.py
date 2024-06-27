@@ -142,7 +142,8 @@ class PFPlotter(QWidget):
             text_item = pg.TextItem(html=item['html'], anchor=item['anchor'])
             text_item.setPos(item['x'], item['y'])
             self.plot_widget.addItem(text_item)
-            
+    
+    @pyqtSlot(np.ndarray)
     def update_particles(self, particles):
         # Method to update the particles on the plot
         if particles is not None:
@@ -171,7 +172,8 @@ class PFPlotter(QWidget):
 
         indices = np.random.choice(num_particles, max_samples, replace=False)
         return particles[indices]
-
+    
+    @pyqtSlot(np.ndarray)
     def update_actual_position(self, actual_position):
         if actual_position is not None:
             self.actual_position_plot_item.setData([actual_position[0]], [actual_position[1]])

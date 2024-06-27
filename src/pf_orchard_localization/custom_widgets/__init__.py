@@ -1,6 +1,6 @@
 from .pf_settings_dialog import PfSettingsDialog
 from .misc_small_widgets import (PfMainWindow, PfControlButtons, PfStartLocationControls, PfCheckBoxes,
-                                 Console, ImageDisplay, PfModeSelector, ImageBrowsingControls, DataFileTimeLine,
+                                 Console, ImageDisplay, PfModeSelector, ImageBrowsingControls,
                                  ImageNumberLabel, ImageDelaySlider, CachedDataCreator, PfChangeParametersButton,
                                  PfQueueSizeLabel, RosConnectButton, CalibrationDataControls)
 from .pf_plotter import TreatingPFPlotter

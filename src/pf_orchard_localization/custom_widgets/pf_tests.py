@@ -2,8 +2,8 @@ import csv
 import os
 import numpy as np
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpinBox, QFileDialog, QMessageBox
-from PyQt6.QtCore import pyqtSignal
-
+from PyQt6.QtCore import pyqtSignal, pyqtSlot
+from ..utils.pf_evaluation import PfTestRegimen
 
 class PfTestControls(QWidget):
     runAllTestsClicked = pyqtSignal()
@@ -24,13 +24,15 @@ class PfTestControls(QWidget):
         self.run_selected_button.setToolTip("Run the selected test")
         self.run_selected_button.setMinimumWidth(120)
 
-        self.reset_button = QPushButton("Reset")
-        self.reset_button.setToolTip("Reset the test regimen")
-        self.reset_button.setMinimumWidth(120)
+        # self.reset_button = QPushButton("Reset")
+        # self.reset_button.setToolTip("Reset the test regimen")
+        # self.reset_button.setMinimumWidth(120)
 
-        self.save_button = QPushButton("Save Results")
-        self.save_button.setToolTip("Save the test results to a file")
-        self.save_button.setMinimumWidth(120)
+        # self.save_button = QPushButton("Save Results")
+        # self.save_button.setToolTip("Save the test results to a file")
+        # self.save_button.setMinimumWidth(120)
+        
+        #TODO i think i can just add a row with a save location edit, a choose location button, and a save data checkbox
 
         self.test_selection_label = QLabel("Test Selection:")
         self.test_selection_label.setToolTip("Select the test to run")
@@ -81,8 +83,6 @@ class PfTestControls(QWidget):
         self.layer_1_layout = QHBoxLayout()
         self.layer_1_layout.addWidget(self.run_all_button)
         self.layer_1_layout.addWidget(self.run_selected_button)
-        self.layer_1_layout.addWidget(self.reset_button)
-        self.layer_1_layout.addWidget(self.save_button)
 
         self.layer_2_layout = QHBoxLayout()
         self.layer_2_layout.addWidget(self.test_selection_label)
@@ -111,36 +111,29 @@ class PfTestControls(QWidget):
         self.load_tests_button.clicked.connect(self.load_tests_button_clicked)
         self.run_all_button.clicked.connect(self.run_all_button_clicked)
         self.run_selected_button.clicked.connect(self.run_selected_button_clicked)
-        self.reset_button.clicked.connect(self.reset_tests)
-        self.save_button.clicked.connect(self.save_results)
 
-        self.test_regimen = None
+
+    def load_pf_test_names(self):
+        pf_test_regimen = PfTestRegimen(test_info_file_path=self.main_app_manager.parameters_data.test_start_info_path)
+        
+        if len(pf_test_regimen.pf_tests) == 0:
+            raise FileNotFoundError("No tests found in the test regimen file or idk something wack")
+        
+        for pf_test in pf_test_regimen.pf_tests:
+            self.test_selection_combobox.addItem(pf_test.test_name)
 
     def run_all_button_clicked(self):
-        if not self.tests_loaded:
-            return
         if self.run_all_button.text() == "Run All Tests":
             self.runAllTestsClicked.emit()
         else:
             self.abortAllTestsClicked.emit()
 
     def run_selected_button_clicked(self):
-        if not self.tests_loaded:
-            return
         if self.run_selected_button.text() == "Run Selected Test":
             self.runSelectedTestClicked.emit()
         else:
             self.abortSelectedTestClicked.emit()
 
-    @property
-    def tests_loaded(self):
-        if self.test_regimen is None:
-            self.main_app_manager.print_message("No tests loaded")
-            return False
-        if len(self.test_regimen.pf_tests) == 0:
-            self.main_app_manager.print_message("No tests loaded")
-            return False
-        return True
 
     def set_running_all_tests(self, running_all_tests: bool):
         if running_all_tests:
@@ -150,8 +143,6 @@ class PfTestControls(QWidget):
             self.run_all_button.setText("Run All Tests")
             self.run_all_button.setToolTip("Start the test regimen")
         self.run_selected_button.setDisabled(running_all_tests)
-        self.reset_button.setDisabled(running_all_tests)
-        self.save_button.setDisabled(running_all_tests)
         self.load_tests_button.setDisabled(running_all_tests)
         self.tests_per_location_spinbox.setDisabled(running_all_tests)
         self.test_selection_combobox.setDisabled(running_all_tests)
@@ -165,8 +156,6 @@ class PfTestControls(QWidget):
             self.run_selected_button.setText("Run Selected Test")
             self.run_selected_button.setToolTip("Run the selected test")
         self.run_all_button.setDisabled(running_selected_test)
-        self.reset_button.setDisabled(running_selected_test)
-        self.save_button.setDisabled(running_selected_test)
         self.load_tests_button.setDisabled(running_selected_test)
         self.tests_per_location_spinbox.setDisabled(running_selected_test)
         self.test_selection_combobox.setDisabled(running_selected_test)
@@ -184,190 +173,52 @@ class PfTestControls(QWidget):
         else:
             self.load_test(file_name[0])
 
-    def load_test(self, file_name):
-        self.test_regimen = PfTestRegimen(file_name, self.main_app_manager.print_message)
-
-        self.test_selection_combobox.clear()
-        for test_name in self.test_regimen.test_names:
-            self.test_selection_combobox.addItem(test_name)
-
-    def save_results(self):
+    def set_save_path(self):
         save_path = QFileDialog.getSaveFileName(self, "Save Results", filter="*.csv")
         if save_path == "":
             return
-        self.test_regimen.process_results(save_path[0])
-
-    def reset_tests(self):
-        if not self.tests_loaded:
-            return
-
-        self.test_regimen.reset_tests()
-
+        
+        save_path = save_path[0]
+        
+        # check if the file already exists, if so, have popup to ask if they want to overwrite
+        if os.path.exists(save_path):
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setText("File already exists")
+            msg_box.setInformativeText("Do you want to overwrite the file?")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            msg_box.setDefaultButton(QMessageBox.StandardButton.No)
+            ret = msg_box.exec()
+            if ret == QMessageBox.StandardButton.No:
+                return
+        
+        return save_path
+    
+    # TODO: implement this
+    def get_save_path(self):
+        return None
+    
+    @pyqtSlot(float, int)
     def update_trial_info(self, trial_time_elapsed, num_particles):
         self.time_elapsed_label.setText("Time Elapsed: " + str(round(trial_time_elapsed, 1)) + "s")
         self.particle_number_label.setText("Particles Count: " + str(num_particles))
 
+    @pyqtSlot(int)
     def update_trial_number(self, trial_num):
         self.trial_number_label.setText("Trial: " + str(trial_num))
 
+    @pyqtSlot(int)
     def update_test_number(self, test_num):
         self.test_number_label.setText("Test: " + str(test_num))
 
+    @pyqtSlot(float, float)
     def update_convergence_rate(self, convergence_rate_current, convergence_rate_all):
         self.convergence_rate_label.setText("Convergence Rate: Current: " + str(round(convergence_rate_current, 2)) + ", All: " + str(round(convergence_rate_all, 2)))
 
     def update_test_time(self, test_time_current, test_time_all):
         self.test_time_label.setText("Average Time: Current: " + str(round(test_time_current, 2)) + ", All: " + str(round(test_time_all, 2)))
 
-
-
-
-
-class PfTestRegimen:
-    def __init__(self, file_name, print_message_func):
-
-        self.print_message_func = print_message_func
-
-        self.file_name = file_name
-        self.test_names = []
-        self.pf_tests = []
-
-        with open(file_name, newline='') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                self.test_names.append(row['test_name'])
-                pf_test = PfTest(row['test_name'],
-                                 float(row['start_x']),
-                                 float(row['start_y']),
-                                 float(row['start_width']),
-                                 float(row['start_length']),
-                                 float(row['start_rotation']),
-                                 float(row['orientation_center']),
-                                 float(row['orientation_range']),
-                                 row['data_file_name'],
-                                 float(row['start_time']))
-
-                self.pf_tests.append(pf_test)
-
-        self.num_tests = len(self.test_names)
-        self.current_test = 0
-
-        self.num_trials_per_location = 1
-
-    def process_results(self, save_path=None):
-        completed_tests = []
-        for pf_test in self.pf_tests:
-            if pf_test.test_completed:
-                completed_tests.append(pf_test)
-
-        avg_convergence_rates = np.zeros(len(completed_tests))
-        avg_times_all = np.zeros(len(completed_tests))
-        avg_times_converged = np.zeros(len(completed_tests))
-
-        for i in range(len(completed_tests)):
-            convergence_rate, avg_time_all, avg_time_converged = completed_tests[i].get_results()
-            avg_convergence_rates[i] = convergence_rate
-            avg_times_all[i] = avg_time_all
-            avg_times_converged[i] = avg_time_converged
-
-        # Calculate the overall average time for trials that converged, removing nan values
-        overall_avg_time_converged = np.nanmean(avg_times_converged)
-
-        # Calculate the overall average convergence rate
-        overall_avg_convergence_rate = np.mean(avg_convergence_rates)
-
-        # Save the results to a csv file
-        if save_path is not None:
-            if not save_path.endswith(".csv"):
-                save_path = save_path + ".csv"
-
-            # check if the file already exists, if so, have popup to ask if they want to overwrite
-            if os.path.exists(save_path):
-                msg_box = QMessageBox()
-                msg_box.setIcon(QMessageBox.Warning)
-                msg_box.setText("File already exists")
-                msg_box.setInformativeText("Do you want to overwrite the file?")
-                msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-                msg_box.setDefaultButton(QMessageBox.No)
-                ret = msg_box.exec_()
-                if ret == QMessageBox.No:
-                    return
-
-            with open(save_path, "w") as f:
-                writer = csv.writer(f)
-                writer.writerow(["Start Location", "Convergence Rate", "Average Time", "Average Time Converged"])
-                for i in range(len(completed_tests)):
-                    writer.writerow([i, avg_convergence_rates[i], avg_times_all[i], avg_times_converged[i]])
-
-                writer.writerow(["Overall Average Time Converged", overall_avg_time_converged])
-                writer.writerow(["Overall Average Convergence Rate", overall_avg_convergence_rate])
-
-        # Print the results to the console
-        self.print_message_func("Results:")
-        for i in range(len(completed_tests)):
-            self.print_message_func("Start Location: {}   Convergence Rate: {}   Average Time: {}   Average Time Converged: {}".format(
-                i, avg_convergence_rates[i], avg_times_all[i], avg_times_converged[i]
-            ))
-        self.print_message_func("Overall Average Time Converged: {}".format(overall_avg_time_converged))
-        self.print_message_func("Overall Average Convergence Rate: {}".format(overall_avg_convergence_rate))
-
-    def reset_tests(self):
-        for pf_test in self.pf_tests:
-            pf_test.reset_results()
-
-    def reset_test(self, test_num):
-        self.pf_tests[test_num].reset_results()
-
-
-
-class PfTest:
-    def __init__(self, test_name, start_x, start_y, start_width, start_length, start_rotation, orientation_center,
-                 orientation_range, data_file_name, start_time):
-        self.test_name = test_name
-        self.start_x = start_x
-        self.start_y = start_y
-        self.start_width = start_width
-        self.start_length = start_length
-        self.start_rotation = start_rotation
-        self.orientation_center = orientation_center
-        self.orientation_range = orientation_range
-        self.data_file_name = data_file_name
-        self.start_time = start_time
-
-        self.results_distances = []
-        self.results_convergence_accuracy = []
-        self.results_run_times = []
-
-        self.test_completed = False
-
-    def __repr__(self):
-        return f"Test Name: {self.test_name}, Start X: {self.start_x}, Start Y: {self.start_y}, Start Width: {self.start_width}, Start Length: {self.start_length}, Start Rotation: {self.start_rotation}, Orientation Center: {self.orientation_center}, Orientation Range: {self.orientation_range}, Data File Name: {self.data_file_name}, Start Time: {self.start_time}"
-
-    def reset_results(self):
-        self.test_completed = False
-        self.results_distances = []
-        self.results_convergence_accuracy = []
-        self.results_run_times = []
-
-    def add_results(self, run_time, correct_convergence, distance_to_converge):
-        self.results_distances.append(distance_to_converge)
-        self.results_convergence_accuracy.append(correct_convergence)
-        self.results_run_times.append(run_time)
-
-    def get_results(self):
-        convergences = np.array(self.results_convergence_accuracy)
-        run_times = np.array(self.results_run_times)
-
-        # Calculate the convergence rate
-        convergence_rate = np.sum(convergences) / len(convergences)
-
-        # Calculate the average time to convergence
-        avg_time_all = np.sum(run_times) / len(run_times)
-
-        # Calculate the average time for trials that converged
-        avg_time_converged = np.sum(run_times * convergences) / np.sum(convergences)
-
-        return convergence_rate, avg_time_all, avg_time_converged
-
-    def set_completed(self):
-        self.test_completed = True
+    @pyqtSlot(float, float, float)
+    def update_trial_results(self, trial_convergence_rate, trial_avg_time_all, trial_avg_time_converged):
+        self.update_convergence_rate(trial_convergence_rate, 0)
+        self.update_test_time(trial_avg_time_all, trial_avg_time_converged)

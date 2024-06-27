@@ -1,140 +1,95 @@
-from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication
-
-import time
-import numpy as np
-
-class PfMode:
+from PyQt6.QtCore import pyqtSignal, pyqtSlot, QObject
+from ..utils import PfTestExecutorQt
+from ..pf_threads import PfBagThread, PfCachedThread, PfTestExecutorQt
+        
+    
+class PfMode(QObject):
+    
+    stop_pf_signal = pyqtSignal()
+    
     def __init__(self, main_app_manager):
+        
         self.main_app_manager = main_app_manager
-
-        self.pf_continuous_active = False
-        self.converged = False
-        self.is_processing = False
-        self.timer = None
 
         self.mode_active = False
 
         self.mode_name = "PF - Recorded Data"
+        
+        self.pf_thread = None
+        
+        self.thread_deleted = True
+        
+        super().__init__()
 
     def ensure_pf_stopped(self):
-        if self.pf_continuous_active:
-            self.stop_pf_continuous()
-
-    def send_next_msg(self):
-        if self.is_processing:
-            return
-
-        self.is_processing = True
-
-        current_msg = self.main_app_manager.data_manager.get_next_msg()
-
-        if current_msg is None:
-            success = self.main_app_manager.load_next_data_file(load_first_image=False)
-            if not success:
-                self.stop_pf_continuous()
-                self.main_app_manager.print_message("Failed to load next data file. Stopping particle filter.")
-                return
-
-            current_msg = self.main_app_manager.data_manager.get_next_msg()
-
-        self.main_app_manager.data_file_time_line.set_time_line(self.main_app_manager.data_manager.current_data_file_time_stamp)
-
-        if current_msg['topic'] == 'odom':
-            x_odom, theta_odom, time_stamp_odom = self.get_odom_data(current_msg)
-            self.main_app_manager.pf_engine.handle_odom(x_odom, theta_odom, time_stamp_odom)
-
-        elif current_msg['topic'] == 'image':
-
-            self.get_data_from_image_msg(current_msg)
-
-            if not self.is_processing:
-                return
-
-        self.converged = self.main_app_manager.pf_engine.check_convergence()
-        if self.converged and self.main_app_manager.parameters_pf.stop_when_converged:
-            self.stop_pf_continuous()
-
-        self.is_processing = False
-
-    def get_data_from_image_msg(self, current_msg):
-
-        positions, widths, class_estimates, seg_img = self.main_app_manager.trunk_data_connection.get_trunk_data(
-                                                                current_msg, return_seg_img=True)
-
-        if positions is None:
-            if self.main_app_manager.cached_data_creator.cache_data_enabled:
-                self.main_app_manager.cached_data_creator.cache_tree_data(None, None, None, None,
-                                                                          current_msg['timestamp'])
-            self.is_processing = False
-            return
-
-        self.main_app_manager.image_number_label.set_img_number_label(
-            self.main_app_manager.data_manager.current_img_position,
-            self.main_app_manager.data_manager.num_img_msgs)
-
-        tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
-        self.main_app_manager.pf_engine.scan_update(tree_data)
-
-        best_guess = self.main_app_manager.pf_engine.best_particle
-        self.main_app_manager.plotter.update_particles(self.main_app_manager.pf_engine.downsample_particles())
-        self.main_app_manager.plotter.update_position_estimate(best_guess)
-
-        if self.main_app_manager.cached_data_creator.cache_data_enabled:
-            self.main_app_manager.cached_data_creator.cache_tree_data(positions, widths, class_estimates, best_guess,
-                                                                      current_msg['timestamp'])
-            self.main_app_manager.cached_data_creator.save_image(seg_img, current_msg['timestamp'])
-
-    def get_odom_data(self, current_msg):
-        odom_data = current_msg['data']
-        x_odom = odom_data.twist.twist.linear.x
-        theta_odom = odom_data.twist.twist.angular.z
-        time_stamp_odom = odom_data.header.stamp.sec + odom_data.header.stamp.nanosec * 1e-9
-
-        if self.main_app_manager.cached_data_creator.cache_data_enabled:
-            self.main_app_manager.cached_data_creator.cache_odom_data(x_odom, theta_odom, time_stamp_odom)
-
-        return x_odom, theta_odom, time_stamp_odom
-
-    def cont_button_clicked(self):
-        self.send_next_msg()
-        while not self.main_app_manager.data_manager.at_img_msg:
-            self.send_next_msg()
+        if self.thread_deleted:
+            return 
+        
+        self.stop_button_clicked()
 
     def enable_disable_widgets(self, enable):
-        self.main_app_manager.enable_visible_widgets(enable)
-        
-        if not enable:
-            self.main_app_manager.control_buttons.setEnabled(True)
-            self.main_app_manager.control_buttons.single_step_button.setEnabled(False)
-            self.main_app_manager.control_buttons.reset_button.setEnabled(False)
-            self.main_app_manager.console.setEnabled(True)
-            self.main_app_manager.image_display.setEnabled(True)
-            self.main_app_manager.plotter.setEnabled(True)
-            
-               
-        
-    def start_pf_continuous(self):
-        self.main_app_manager.control_buttons.set_stop()
-        # self.main_app_manager.change_parameters_button.disable()
-        # self.main_app_manager.data_file_controls.setEnabled(False)
-        # self.main_app_manager.start_location_controls.disable()
-        # self.main_app_manager.checkboxes.disable()
-        self.enable_disable_widgets(enable=False)
-        self.pf_continuous_active = True
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.send_next_msg)
-        self.timer.start(self.main_app_manager.image_delay_slider.get_delay_ms())
 
-    def stop_pf_continuous(self):
-        self.timer.stop()
-        self.pf_continuous_active = False
-        self.is_processing = False
-        self.main_app_manager.control_buttons.set_start()
-        # self.main_app_manager.change_parameters_button.enable()
-        # self.main_app_manager.data_file_controls.setEnabled(True)
-        # self.main_app_manager.start_location_controls.enable()
-        # self.main_app_manager.checkboxes.enable()
+        self.main_app_manager.mode_selector.setEnabled(enable)
+        self.main_app_manager.change_parameters_button.setEnabled(enable)
+        
+        self.main_app_manager.data_file_controls.data_file_time_line.setReadOnly(not enable)
+        self.main_app_manager.image_delay_slider.setEnabled(enable)
+        self.main_app_manager.checkboxes.setEnabled(enable)
+        self.main_app_manager.start_location_controls.setReadOnly(not enable)
+        self.main_app_manager.control_buttons.reset_button.setEnabled(enable)
+        self.main_app_manager.control_buttons.single_step_button.setEnabled(enable)
+        self.main_app_manager.data_file_controls.setEnabled(enable)
+        
+        if enable:
+            self.main_app_manager.control_buttons.set_start()
+        else:
+            self.main_app_manager.control_buttons.set_stop() 
+        
+        self.enable_disable_widgets_unique(enable)
+    
+    def enable_disable_widgets_unique(self, enable):
+        self.main_app_manager.cached_data_creator.enable_checkbox.setEnabled(enable)
+        
+    def start_pf(self, single_image):     
+        
+        self.thread_deleted = False
+        
+        if not single_image:   
+            self.enable_disable_widgets(enable=False)
+             
+
+        self.pf_thread = PfBagThread(pf_engine=self.main_app_manager.pf_engine,
+                                     data_manager=self.main_app_manager.data_file_controls.data_manager,
+                                     get_trunk_data_func=self.main_app_manager.trunk_data_connection.get_trunk_data,
+                                     stop_when_converged=self.main_app_manager.parameters_pf.stop_when_converged,
+                                     only_single_image=single_image,
+                                     added_delay=self.main_app_manager.image_delay_slider.get_delay_ms()/1000,
+                                     cache_data_enabled=self.main_app_manager.cached_data_creator.cache_data_enabled)
+        
+        self.pf_thread.load_next_data_file.connect(self.main_app_manager.data_file_controls.load_next_data_file)
+        self.pf_thread.pf_run_message.connect(self.main_app_manager.print_message)
+        self.pf_thread.set_time_line.connect(self.main_app_manager.data_file_controls.set_time_line)
+        self.pf_thread.cache_msg.connect(self.main_app_manager.cached_data_creator.cache_data)
+        self.pf_thread.set_img_number_label.connect(self.main_app_manager.image_number_label.set_img_number_label)  
+        self.pf_thread.plot_best_guess.connect(self.main_app_manager.plotter.update_actual_position)
+        self.pf_thread.plot_particles.connect(self.main_app_manager.plotter.update_particles)
+        
+        
+        self.main_app_manager.data_file_controls.data_file_loaded.connect(self.pf_thread.data_manager_receiver)  
+        
+        self.stop_pf_signal.connect(self.pf_thread.stop_pf)
+        
+        self.pf_thread.destroyed.connect(self.thread_deleted_slot)
+        self.pf_thread.finished.connect(self.thread_clean_up)
+        
+        self.pf_thread.start()        
+        
+    def thread_clean_up(self):
+        
+        self.pf_thread.wait()
+        
+        self.pf_thread.deleteLater()
+        
         self.enable_disable_widgets(enable=True)
 
     def activate_mode(self):
@@ -150,7 +105,6 @@ class PfMode:
         self.main_app_manager.mode_selector.show()
         self.main_app_manager.change_parameters_button.show()
         
-        self.main_app_manager.data_file_time_line.show()
         self.main_app_manager.image_delay_slider.show()
         
         self.main_app_manager.checkboxes.show()
@@ -163,14 +117,47 @@ class PfMode:
         self.main_app_manager.console.show()
         
         self.main_app_manager.plotter.show()
+    
+    @pyqtSlot()
+    def thread_deleted_slot(self):
+        self.thread_deleted = True
         
-
+    @pyqtSlot()
+    def start_button_clicked(self):
+        if not self.thread_deleted:
+            return
+        
+        self.start_pf(False)
+    
+    @pyqtSlot()
+    def continue_button_clicked(self):
+        if not self.thread_deleted:
+            return
+        
+        self.start_pf(True)
+    
+    @pyqtSlot()
+    def stop_button_clicked(self):
+        if self.thread_deleted:
+            return
+        
+        self.stop_pf_signal.emit()
+        
     def connect_gui(self):
-        self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_pf_continuous)
-        self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_pf_continuous)
-        self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.cont_button_clicked)
-
+        self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_button_clicked)
+        self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_button_clicked)
+        self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.continue_button_clicked)
+        
+    
+    def disconnect_gui(self):
+        self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_button_clicked)
+        self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_button_clicked)
+        self.main_app_manager.control_buttons.single_step_button.clicked.disconnect(self.continue_button_clicked)
+        self.main_app_manager.cached_data_creator.enable_checkbox.setChecked(False)
+    
     def deactivate_mode(self):
+        if not self.mode_active:
+            return
 
         self.disconnect_gui()
 
@@ -178,58 +165,57 @@ class PfMode:
 
         self.ensure_pf_stopped()
 
-    def disconnect_gui(self):
-        self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_pf_continuous)
-        self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_pf_continuous)
-        self.main_app_manager.control_buttons.single_step_button.clicked.disconnect(self.cont_button_clicked)
-        self.main_app_manager.cached_data_creator.enable_checkbox.setChecked(False)
+    
 
     def shutdown_hook(self):
         self.ensure_pf_stopped()
 
-
 class PfModeCached(PfMode):
     def __init__(self, main_app_manager):
         super().__init__(main_app_manager)
-        self.position_estimate = None
-        self.position_gt = None
+    
+    def enable_disable_widgets_unique(self, enable):
+        pass
 
-    def get_data_from_image_msg(self, current_msg):
+    def start_pf(self, single_image):     
+        
+        self.thread_deleted = False
+        
+        if not single_image:   
+            self.enable_disable_widgets(enable=False) 
 
-        positions, widths, class_estimates = self.main_app_manager.trunk_data_connection.get_trunk_data(current_msg)
+        self.pf_thread = PfCachedThread(pf_engine=self.main_app_manager.pf_engine,
+                                     data_manager=self.main_app_manager.data_file_controls.data_manager,
+                                     get_trunk_data_func=self.main_app_manager.trunk_data_connection.get_trunk_data,
+                                     stop_when_converged=self.main_app_manager.parameters_pf.stop_when_converged,
+                                     only_single_image=single_image,
+                                     added_delay=self.main_app_manager.image_delay_slider.get_delay_ms()/1000,
+                                     cache_data_enabled=False)
+        
+        # self.pf_thread.load_next_data_file.connect(self.main_app_manager.data_file_controls.load_next_data_file)
+        self.pf_thread.pf_run_message.connect(self.main_app_manager.print_message)
+        self.pf_thread.set_time_line.connect(self.main_app_manager.data_file_controls.set_time_line)
+        # self.pf_thread.cache_msg.connect(self.main_app_manager.cached_data_creator.cache_data)
+        self.pf_thread.set_img_number_label.connect(self.main_app_manager.image_number_label.set_img_number_label)  
+        self.pf_thread.plot_best_guess.connect(self.main_app_manager.plotter.update_actual_position)
+        self.pf_thread.plot_particles.connect(self.main_app_manager.plotter.update_particles)
+        
+        
+        self.stop_pf_signal.connect(self.pf_thread.stop_pf)
+        
+        # self.main_app_manager.data_file_controls.data_file_loaded.connect(self.pf_thread.data_manager_receiver)   
+            
+        self.pf_thread.destroyed.connect(self.thread_deleted_slot)
 
-        if positions is None:
-            self.is_processing = False
-            return
-
-        tree_data = {'positions': positions, 'widths': widths, 'classes': class_estimates}
-        self.main_app_manager.pf_engine.scan_update(tree_data)
-
-        actual_position = (current_msg['data']['location_estimate'])
-        self.position_gt = np.array([actual_position['x'], actual_position['y']])
-        self.main_app_manager.plotter.update_actual_position(self.position_gt)
-
-        self.position_estimate = self.main_app_manager.pf_engine.best_particle
-        self.main_app_manager.plotter.update_particles(self.main_app_manager.pf_engine.downsample_particles())
-        self.main_app_manager.plotter.update_position_estimate(self.position_estimate)
-
-        self.main_app_manager.image_number_label.set_img_number_label(
-            self.main_app_manager.data_manager.current_img_position,
-            self.main_app_manager.data_manager.num_img_msgs)
-
-    def get_odom_data(self, current_msg):
-        odom_data = current_msg['data']
-        x_odom = odom_data['x_odom']
-        theta_odom = odom_data['theta_odom']
-        time_stamp_odom = current_msg['timestamp']
-
-        return x_odom, theta_odom, time_stamp_odom
-
+        self.pf_thread.finished.connect(self.thread_clean_up)
+        
+        self.pf_thread.start()        
+                
     def setup_gui(self):
+        
         
         self.main_app_manager.mode_selector.show()
         self.main_app_manager.change_parameters_button.show()
-        self.main_app_manager.data_file_time_line.show()
         self.main_app_manager.image_delay_slider.show()
         self.main_app_manager.checkboxes.show()
         self.main_app_manager.start_location_controls.show()
@@ -240,239 +226,178 @@ class PfModeCached(PfMode):
         self.main_app_manager.console.show()
         self.main_app_manager.plotter.show()
 
-    def connect_gui(self):
-        self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_pf_continuous)
-        self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_pf_continuous)
-        self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.cont_button_clicked)
-
-
-    def disconnect_gui(self):
-
-        self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_pf_continuous)
-        self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_pf_continuous)
-        self.main_app_manager.control_buttons.single_step_button.clicked.disconnect(self.cont_button_clicked)
-
-
 class PfModeCachedTests(PfModeCached):
+    
     def __init__(self, main_app_manager):
         super().__init__(main_app_manager)
-        self.convergence_threshold = 0.5
         self.mode_name = "PF - Recorded Data Tests"
-
+        
+        self.running_all_tests = False
+    
+    def start_pf(self, load_data_only=False):
+        
+        self.thread_deleted = False
+        
+        test_index = None
+        
+        if not self.run_all_tests_flag:
+            test_index = self.main_app_manager.pf_test_controls.get_selected_test()
+            
+        if not load_data_only:
+            self.enable_disable_widgets(enable=False)
+  
+        self.pf_thread = PfTestExecutorQt(pf_engine=self.main_app_manager.pf_engine,
+                                          parameters_pf=self.main_app_manager.parameters_pf,
+                                          test_info_path=self.main_app_manager.parameters_data.test_start_info_path,
+                                          cached_data_files_dir=self.main_app_manager.parameters_data.data_file_dir,
+                                          num_trials=self.main_app_manager.pf_test_controls.get_num_trials_per_location(),
+                                          get_trunk_data_func=self.main_app_manager.trunk_data_connection.get_trunk_data,
+                                          save_path=self.main_app_manager.pf_test_controls.get_save_path(),
+                                          convergence_threshold=0.5,
+                                          test_index=test_index,
+                                          load_data_only=load_data_only,)
+        
+        #TODO connection galore
+        self.pf_thread.reset_pf_app.connect(self.main_app_manager.reset_pf)
+        self.pf_thread.update_test_number.connect(self.main_app_manager.pf_test_controls.update_test_number)
+        self.pf_thread.update_trial_number.connect(self.main_app_manager.pf_test_controls.update_trial_number)
+        self.pf_thread.set_time_line.connect(self.main_app_manager.data_file_controls.set_time_line)
+        self.pf_thread.plot_gt_position.connect(self.main_app_manager.plotter.update_actual_position)
+        self.pf_thread.plot_particles.connect(self.main_app_manager.plotter.update_particles)
+        self.pf_thread.update_image_number.connect(self.main_app_manager.image_number_label.set_img_number_label)
+        self.pf_thread.update_trial_info.connect(self.main_app_manager.pf_test_controls.update_trial_info)
+        self.pf_thread.update_ui_with_trial_results.connect(self.main_app_manager.pf_test_controls.update_trial_results)
+        self.pf_thread.print_message.connect(self.main_app_manager.print_message)
+        
+        self.stop_pf_signal.connect(self.pf_thread.stop_pf)
+        
+        self.pf_thread.destroyed.connect(self.thread_deleted_slot)
+        self.pf_thread.finished.connect(self.thread_clean_up)
+        
+        self.pf_thread.start()
+        
+                
     def run_all_tests(self):
-        self.tests_aborted = False
-        self.main_app_manager.pf_test_controls.set_running_all_tests(True)
-
-        self.main_app_manager.print_message("Running all tests")
-
-        for test_info in self.main_app_manager.pf_test_controls.test_regimen.pf_tests:
-            self.run_test(test_info)
-            if self.tests_aborted:
-                break
-            test_info.test_completed = True
-
-        self.main_app_manager.pf_test_controls.set_running_all_tests(False)
-
-    def abort_all_tests(self):
-        self.pf_active = False
-        self.tests_aborted = True
-
+        if not self.thread_deleted:
+            return
+        
+        self.run_all_tests_flag = True
+        
+        self.start_pf()
+    
     def run_selected_test(self):
-        self.tests_aborted = False
-        self.main_app_manager.pf_test_controls.set_running_selected_test(True)
-
-        current_selection = self.main_app_manager.pf_test_controls.get_selected_test()
-        test_info = self.main_app_manager.pf_test_controls.test_regimen.pf_tests[current_selection]
-
-        self.run_test(test_info)
-
-        if self.tests_aborted:
-            test_info.reset_results()
-
-
-
-        self.main_app_manager.pf_test_controls.set_running_selected_test(False)
-
-    def run_test(self, test_info):
-        self.main_app_manager.pf_test_controls.update_test_number(test_info.test_name)
-
-        self.main_app_manager.print_message("Running test: " + test_info.test_name)
-
-        self.load_test_data(test_info=test_info)
-
-        num_trials = self.main_app_manager.pf_test_controls.get_num_trials_per_location()
-
-        test_info.reset_results()
-
-        data_file_name = test_info.data_file_name + ".json"
-
-        # TODO: Does this auto change the file combo box?
-        self.main_app_manager.open_data_file(data_file_name)
-
-        for trial_num in range(num_trials):
-            self.main_app_manager.print_message("Starting trial " + str(trial_num + 1))
-            self.main_app_manager.pf_test_controls.update_trial_number(trial_num + 1)
-            self.run_trial(test_info)
-            if self.tests_aborted:
-                return
-            trial_convergence_rate, trial_avg_time_all, trial_avg_time_converged = test_info.get_results()
-            self.main_app_manager.pf_test_controls.update_convergence_rate(trial_convergence_rate, 0)
-            self.main_app_manager.pf_test_controls.update_test_time(trial_avg_time_all, 0)
-
-
-        # self.main_app_manager.change_parameters_button.enable()
-
-    def load_test_data(self, test_index=None, test_info=None):
-
-        if test_index is not None:
-            test_info = self.main_app_manager.pf_test_controls.test_regimen.pf_tests[test_index]
-
-        # self.main_app_manager.change_parameters_button.disable()
-
-        self.main_app_manager.parameters_pf.start_pose_center_x = test_info.start_x
-        self.main_app_manager.parameters_pf.start_pose_center_y = test_info.start_y
-        self.main_app_manager.parameters_pf.start_width = test_info.start_width
-        self.main_app_manager.parameters_pf.start_height = test_info.start_length
-        self.main_app_manager.parameters_pf.start_rotation = test_info.start_rotation
-        self.main_app_manager.parameters_pf.start_orientation_center = test_info.orientation_center
-        self.main_app_manager.parameters_pf.start_orientation_range = test_info.orientation_range
-
-        self.reset_for_trial(test_info)
-
-    def reset_for_trial(self, test_info):
-        self.main_app_manager.data_file_time_line.set_time_line(test_info.start_time)
-        self.main_app_manager.data_file_time_line_edited()
-        self.main_app_manager.reset_pf(use_ui_parameters=False)
-
-    def run_trial(self, test_info):
-
-        self.reset_for_trial(test_info)
-
-        self.trial_start_time = time.time()
-        self.pf_active = True
-
-        while self.pf_active:
-            self.send_next_msg()
-
-        if self.tests_aborted:
-            self.main_app_manager.print_message("Test aborted")
+        if not self.thread_deleted:
             return
-
-        trial_time = time.time() - self.trial_start_time
-        correct_convergence, distance = self.check_converged_location()
-
-        test_info.add_results(trial_time, correct_convergence, distance)
-
-    def send_next_msg(self):
-        current_msg = self.main_app_manager.data_manager.get_next_msg()
-
-        if current_msg is None:
-            self.pf_active = False
+        
+        self.run_all_tests_flag = False
+        
+        self.start_pf()
+    
+    def load_data_only(self):
+        if not self.thread_deleted:
             return
+        
+        self.run_all_tests_flag = False
+        
+        self.start_pf(load_data_only=True)
+    
+    def enable_disable_widgets(self, enable):
 
-        self.main_app_manager.data_file_time_line.set_time_line(self.main_app_manager.data_manager.current_data_file_time_stamp)
-
-        if current_msg['topic'] == 'odom':
-            x_odom, theta_odom, time_stamp_odom = self.get_odom_data(current_msg)
-            self.main_app_manager.pf_engine.handle_odom(x_odom, theta_odom, time_stamp_odom)
-
-        elif current_msg['topic'] == 'image':
-
-            self.get_data_from_image_msg(current_msg)
-
-        self.converged = self.main_app_manager.pf_engine.check_convergence()
-        if self.converged:
-            self.pf_active = False
-
-        current_time = time.time() - self.trial_start_time
-        particle_count = self.main_app_manager.pf_engine.particles.shape[0]
-        self.main_app_manager.pf_test_controls.update_trial_info(current_time, particle_count)
-
-    def check_converged_location(self):
-        position_estimate = self.position_estimate[0:2]
-
-        actual_position = self.position_gt[0:2]
-
-        distance = np.linalg.norm(position_estimate - actual_position)
-        if distance < self.convergence_threshold:
-            return True, distance
+        self.main_app_manager.mode_selector.setEnabled(enable)
+        self.main_app_manager.change_parameters_button.setEnabled(enable)
+        
+        self.main_app_manager.checkboxes.setEnabled(enable)
+        
+        if self.run_all_tests_flag:
+            self.main_app_manager.pf_test_controls.set_running_all_tests(not enable)
         else:
-            return False, distance
+            self.main_app_manager.pf_test_controls.set_running_selected_test(not enable)
+        
 
     def setup_gui(self):
         
         self.main_app_manager.mode_selector.show()
         self.main_app_manager.change_parameters_button.show()
+        
         self.main_app_manager.checkboxes.show()
+        self.main_app_manager.start_location_controls.show()
+        
         self.main_app_manager.image_display.show()
         self.main_app_manager.image_number_label.show()
         self.main_app_manager.pf_test_controls.show()
-        self.main_app_manager.data_file_time_line.show()
         self.main_app_manager.data_file_controls.show()
         self.main_app_manager.console.show()
         self.main_app_manager.plotter.show()
 
-        self.main_app_manager.data_file_controls.disable()
-        self.main_app_manager.data_file_time_line.disable()
 
     def connect_gui(self):
 
         self.main_app_manager.pf_test_controls.runAllTestsClicked.connect(self.run_all_tests)
-        self.main_app_manager.pf_test_controls.abortAllTestsClicked.connect(self.abort_all_tests)
+        self.main_app_manager.pf_test_controls.abortAllTestsClicked.connect(self.stop_button_clicked)
         self.main_app_manager.pf_test_controls.runSelectedTestClicked.connect(self.run_selected_test)
-        self.main_app_manager.pf_test_controls.abortSelectedTestClicked.connect(self.abort_all_tests)
-        self.main_app_manager.pf_test_controls.test_selection_combobox.currentIndexChanged.connect(self.load_test_data)
+        self.main_app_manager.pf_test_controls.abortSelectedTestClicked.connect(self.stop_button_clicked)
+        self.main_app_manager.pf_test_controls.test_selection_combobox.currentIndexChanged.connect(self.load_data_only)
+        
+        self.main_app_manager.start_location_controls.setReadOnly(True)
+        self.main_app_manager.data_file_controls.setEnabled(False)
+
+    def activate_mode(self):
+        super().activate_mode()
+        
+        self.main_app_manager.pf_test_controls.load_pf_test_names()
+        
+        self.load_data_only()
+        
+        # load the first test
 
     def deactivate_mode(self):
         self.disconnect_gui()
 
         self.mode_active = False
-        self.abort_all_tests()
+        self.stop_button_clicked()
 
     def disconnect_gui(self):
-        self.main_app_manager.data_file_controls.enable()
-        self.main_app_manager.data_file_time_line.enable()
 
         # disconnect signals
         self.main_app_manager.pf_test_controls.runAllTestsClicked.disconnect(self.run_all_tests)
-        self.main_app_manager.pf_test_controls.abortAllTestsClicked.disconnect(self.abort_all_tests)
+        self.main_app_manager.pf_test_controls.abortAllTestsClicked.disconnect(self.stop_button_clicked)
         self.main_app_manager.pf_test_controls.runSelectedTestClicked.disconnect(self.run_selected_test)
-        self.main_app_manager.pf_test_controls.abortSelectedTestClicked.disconnect(self.abort_all_tests)
-        self.main_app_manager.pf_test_controls.test_selection_combobox.currentIndexChanged.disconnect(
-            self.load_test_data)
+        self.main_app_manager.pf_test_controls.abortSelectedTestClicked.disconnect(self.stop_button_clicked)
+        self.main_app_manager.pf_test_controls.test_selection_combobox.currentIndexChanged.disconnect(self.load_data_only)
+        
+        self.main_app_manager.start_location_controls.setReadOnly(False)
+        self.main_app_manager.data_file_controls.setEnabled(True)
 
-    def shutdown_hook(self):
-        self.abort_all_tests()
 
 class PfModeSaveCalibrationData(PfMode):
+    
+    signal_save_data = pyqtSignal(dict)
+    
     def __init__(self, main_app_manager):
         super().__init__(main_app_manager)
         self.mode_name = "PF - Save Calibration Data"
 
     def setup_gui(self):
         
-        self.main_app_manager.mode_selector.show()
-        self.main_app_manager.change_parameters_button.show()
-        self.main_app_manager.data_file_time_line.show()
-        self.main_app_manager.image_delay_slider.show()
-        self.main_app_manager.checkboxes.show()
-        self.main_app_manager.start_location_controls.show()
-        self.main_app_manager.control_buttons.show()
-        self.main_app_manager.image_display.show()
-        self.main_app_manager.image_number_label.show()
-        self.main_app_manager.data_file_controls.show()
+        super().setup_gui()
+        
         self.main_app_manager.save_calibration_data_controls.show()
-        self.main_app_manager.console.show()
-        self.main_app_manager.plotter.show()
-                
-
-    # def connect_gui(self):
-    #     super().connect_gui()
-    #     self.main_app_manager.save_calibration_data_controls.saveButtonClicked.connect(self.save_calibration_data)
-
-    def get_data_from_image_msg(self, current_msg):
-        super().get_data_from_image_msg(current_msg)
-
-        if self.main_app_manager.save_calibration_data_controls.save_data_enabled:
-            self.main_app_manager.save_calibration_data_controls.save_data(current_msg)
-
+        
+        self.main_app_manager.cached_data_creator.hide()
+        
+    def enable_disable_widgets_unique(self, enable):
+        self.main_app_manager.save_calibration_data_controls.set_running(not enable)
+        
+    def connect_gui(self):
+        # self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_button_clicked)
+        # self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_button_clicked)
+        # self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.continue_button_clicked)
+        self.main_app_manager.trunk_data_connection.signal_save_calibration_data.connect(self.main_app_manager.save_calibration_data_controls.save_data)
+        super().connect_gui()
+    
+    def disconnect_gui(self):
+    #     self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_button_clicked)
+    #     self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_button_clicked)
+    #     self.main_app_manager.control_buttons.single_step_button.clicked.disconnect(self.continue_button_clicked)
+        self.main_app_manager.trunk_data_connection.signal_save_calibration_data.disconnect(self.main_app_manager.save_calibration_data_controls.save_data)
+        super().disconnect_gui()

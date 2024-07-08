@@ -232,7 +232,7 @@ class DataFileControls(QWidget):
         if message is not None:
             self.data_file_controls_message.emit(message)
             
-        self.set_opened(set_to_current=False)
+        self.set_opened(set_to_current=success)
         
         if not success:
             self.data_manager = None
@@ -250,15 +250,3 @@ class DataFileControls(QWidget):
         self.data_file_open_next_button.setText("Open Next")
         if set_to_current:
             self.set_combo_box_to_current()
-        
-        # self.data_file_open_button.repaint()
-
-    # def disable(self):
-    #     self.data_file_selector.setDisabled(True)
-    #     self.data_file_open_button.setDisabled(True)
-    #     self.data_file_open_next_button.setDisabled(True)
-
-    # def enable(self):
-    #     self.data_file_selector.setDisabled(False)
-    #     self.data_file_open_button.setDisabled(False)
-    #     self.data_file_open_next_button.setDisabled(False)

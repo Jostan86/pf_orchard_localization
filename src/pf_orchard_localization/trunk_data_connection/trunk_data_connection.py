@@ -12,7 +12,8 @@ import copy
 # Function to only import these if they're needed
 def import_trunk_analyzer(width_estimation_config_file_path):
     from trunk_width_estimation import TrunkAnalyzer, TrunkSegmenter, PackagePaths
-    return TrunkAnalyzer(PackagePaths(), combine_segmenter=False), TrunkSegmenter(PackagePaths())
+    config_file = "width_estimation_config_apple.yaml"
+    return TrunkAnalyzer(PackagePaths(config_file), combine_segmenter=False), TrunkSegmenter(PackagePaths(config_file))
 
 # class for trunk data connection
 class TrunkDataConnection(QThread):
@@ -58,7 +59,6 @@ class TrunkDataConnection(QThread):
         self.results_kept = None
         
         self.current_msg = None
-        
         
         self.wait_condition = QWaitCondition()
         self.mutex = QMutex()
@@ -126,7 +126,7 @@ class TrunkDataConnection(QThread):
     def get_results(self, current_msg, results_dict, results):
 
         self.positions, self.widths, self.class_estimates, self.x_positions_in_image, self.results_kept = (
-            self.trunk_analyzer.pf_helper(current_msg['depth_image'], results_dict=results_dict))
+            self.trunk_analyzer.get_width_estimation_pf(current_msg['depth_image'], results_dict=results_dict))
 
         if self.emitting_save_calibration_data:
             calibration_data = copy.deepcopy(current_msg)
@@ -187,19 +187,18 @@ class TrunkDataConnection(QThread):
 class TrunkDataConnectionCachedData(TrunkDataConnection):
     def __init__(self,
                  cached_img_directory,
-                 seg_image_display_func: Callable[[Optional[np.ndarray]], None],
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
-                 message_printer: Callable[[List[str]], None] = None):
+                ):
 
-        super().__init__(seg_image_display_func=seg_image_display_func,
-                         class_mapping=class_mapping,
-                         offset=offset,
-                         message_printer=message_printer)
+        super().__init__(class_mapping=class_mapping, offset=offset)
 
         self.cached_img_directory = cached_img_directory
-
-    def get_trunk_data(self, current_msg, return_seg_img=True):
+    
+    def get_trunk_data(self, current_msg, return_seg_img=False):
+        
+        # print('hi1')
+        # print(current_msg)
 
         if current_msg['data'] is None:
             return None, None, None
@@ -209,11 +208,10 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
         self.widths = np.array(msg_data['widths'])
         self.class_estimates = np.array(msg_data['classes'], dtype=np.int32)
 
-        
         self.seg_img = self.load_cached_img(current_msg['timestamp'])
 
-        if self.seg_img is not None and self.seg_image_display_func is not None:
-            self.seg_image_display_func(self.seg_img)
+        if self.segmented_image_display_num != -1:
+            self.signal_segmented_image.emit(self.seg_img, self.segmented_image_display_num)
 
         self.class_estimates = self.remap_classes(self.class_estimates)
         self.print_messages(self.positions, self.widths)
@@ -257,6 +255,8 @@ class TrunkDataConnectionJetson(TrunkDataConnection):
         self.seg_img = None
 
     def get_trunk_data(self, current_msg, return_seg_img=False):
+        
+        
 
         self.waiting_for_response = True
         self.producer_thread.send_images(current_msg['rgb_image'], current_msg['depth_image'])

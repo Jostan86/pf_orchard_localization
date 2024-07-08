@@ -1,15 +1,6 @@
 FROM osrf/ros:humble-desktop-full
 
-ARG CACHEBUST=1
-
-RUN apt-get update \
-    && apt-get install -y \
-    git \
-    python3-pyqt5 \
-    python3-pip \
-    # libboost-python-dev \
-    # libgl1-mesa-glx \
-    && rm -rf /var/lib/apt/lists/*
+ARG CACHEBUST=2
 
 # Add vscode user with same UID and GID as your host system
 # (copied from https://code.visualstudio.com/remote/advancedcontainers/add-nonroot-user#_creating-a-nonroot-user)
@@ -29,6 +20,15 @@ USER $USERNAME
 # Add user to video group to allow access to webcam
 RUN sudo usermod --append --groups video $USERNAME
 
+RUN sudo apt-get update 
+RUN sudo apt-get install -y git python3-pip libxcb-cursor0
+    # git \
+    # # python3-pyqt5 \
+    # python3-pip \
+    # # libboost-python-dev \
+    # # libgl1-mesa-glx \
+    # && rm -rf /var/lib/apt/lists/*
+
 RUN pip install --upgrade pip
 
 RUN pip install \
@@ -38,15 +38,16 @@ RUN pip install \
     scipy \
     scikit-image  \
     rosbags \
+    PyQt6 \
     utm 
 
 RUN pip install numpy==1.26.4
 
 # Update all packages
-# RUN sudo apt update && sudo apt upgrade -y
+RUN sudo apt update && sudo apt upgrade -y
 
 # Rosdep update
-# RUN rosdep update
+RUN rosdep update
 
 # Create a directory for external repositories
 RUN mkdir -p ~/my_python_packages

@@ -1,6 +1,6 @@
 # Center of the area where particles are initially placed
-start_pose_center_x: 16.0  # meters
-start_pose_center_y: 99.2  # meters
+start_pose_center_x: 11.5  # meters
+start_pose_center_y: 12.42  # meters
 
 # Density of particles in the initial distribution
 particle_density: 200  # particles / m^2

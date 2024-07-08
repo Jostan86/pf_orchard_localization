@@ -17,6 +17,8 @@ initial_data_file_index: 0  # index of the bag file
 # Jazz apple orchard
 # ----------------------
 pf_config_file_path: /pf_orchard_localization/config/parameters_pf.yaml
+# pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
+
 map_data_path: /media/jostan/portabits/pf_app_data/map_data_jazz_new.json
 
 data_file_dir: /media/jostan/portabits/pf_app_data/pf_cached_data/pf_data/

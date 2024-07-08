@@ -13,7 +13,7 @@ from ..utils.parameters import ParametersPf, ParametersBagData, ParametersCached
 from ..pf_engine import PFEngine
 from map_data_tools import MapData
 import logging
-from ..trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCachedData
+from ..trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCachedData, TrunkDataConnectionRos2
 from ..app_modes import PfMode, PfModeCached, PfModeCachedTests, PlaybackMode, PfLiveMode, PfModeSaveCalibrationData
 import os
 from functools import partial
@@ -161,8 +161,6 @@ class PfAppBase(PfMainWindow):
 
         self.mode_selector.mode_selector.currentIndexChanged.connect(self.mode_changed)
         
-        
-        
         self.trunk_data_connection.signal_segmented_image.connect(self.image_display.load_image)
         self.trunk_data_connection.signal_unfiltered_image.connect(self.image_display.load_image)
         self.trunk_data_connection.signal_original_image.connect(self.image_display.load_image)
@@ -261,125 +259,6 @@ class PfAppBase(PfMainWindow):
                 mode.activate_mode()
                 self.active_mode = mode
                 break
-        
-        # add the mode names back to the mode selector
-        # self.mode_selector.set_modes(self.modes)
-        
-    # def data_file_time_line_edited(self):
-    #     """Change the time the data file is at based on a time entered in the time line edit box by the user"""
-
-    #     time_stamp = self.data_file_time_line.data_file_time_line.text()
-
-    #     # Check if the value entered is a number
-    #     try:
-    #         time_stamp = float(time_stamp)
-    #     except ValueError:
-    #         self.print_message("Invalid time stamp")
-    #         return
-
-    #     # Set the time stamp in the data manager and get the current message
-    #     message, self.current_msg = self.data_manager.set_time_stamp(time_stamp)
-
-    #     self.print_message(message)
-
-    #     # Update the app with the message from the new time stamp and set the time line to match the exact time stamp of the message
-    #     if self.current_msg is not None:
-    #         self.trunk_data_connection.get_trunk_data(self.current_msg)
-    #         self.data_file_time_line.set_time_line(self.data_manager.current_data_file_time_stamp)
-
-    #     self.image_number_label.set_img_number_label(self.data_manager.current_img_position,
-    #                                                       self.data_manager.num_img_msgs)
-
-    # def open_data_file(self, data_file_name: str = None, load_first_image: bool = True):
-    #     """
-    #     Open a data file using a data manager object
-
-    #     Args:
-    #         data_file_name (str): Name of the data file to open
-    #         load_first_image (bool): Whether to load the first image in the data file
-    #     """
-    #     # If no data file name is given, use the current data file selection
-    #     if data_file_name is None:
-    #         data_file_name = self.data_file_controls.current_data_file_selection
-
-    #     self.data_file_controls.set_opening()
-
-    #     data_file_path = self.data_file_controls.data_file_dir + data_file_name
-
-    #     valid, message = self.check_data_file_is_valid(data_file_path)
-        
-    #     if not valid:
-    #         self.data_file_controls.set_opened(message)
-    #         return
-        
-    #     if data_file_path.endswith(".json"):
-    #         data_manager = CachedDataLoader(data_file_path)
-    #     else:
-    #         data_manager = Bag2DataLoader(data_file_path, self.parameters_data.depth_topic, self.parameters_data.rgb_topic, self.parameters_data.odom_topic)
-
-    #     if data_manager.num_img_msgs == 0:
-    #         self.data_file_open_button.set_opened("No images found in data file, check topic names")
-    #         return
-
-    #     self.data_file_time_line.set_time_line(data_manager.current_data_file_time_stamp)
-
-    #     self.data_manager = data_manager
-
-    #     msg = ["Opened bag file: " + data_file_name,]
-    #     msg.append("Number of Odom messages: " + str(self.data_manager.num_odom_msgs))
-    #     msg.append("Number of images: " + str(self.data_manager.num_img_msgs))
-
-    #     self.data_file_controls.set_opened(msg)
-
-    #     if load_first_image:
-    #         self.current_msg = self.data_manager.get_next_img_msg()
-    #         self.trunk_data_connection.get_trunk_data(self.current_msg)
-    #         self.image_number_label.set_img_number_label(self.data_manager.current_img_position,
-    #                                                      self.data_manager.num_img_msgs)
-            
-    # def check_data_file_is_valid(self, data_file_path: str):
-    #     """Check if a data file is valid
-
-    #     Args:
-    #         data_file_name (str): Name of the data file to check
-    #     """
-    #     if not os.path.isfile(data_file_path) and not os.path.isdir(data_file_path):
-    #         return False, "Invalid file name"
-    #     elif data_file_path.endswith(".json") and not self.using_cached_data:
-    #         return False, "Invalid file type, not using cached data"
-    #     elif data_file_path.endswith(".json") and self.using_cached_data:
-    #         return True, "Valid file"
-    #     elif os.path.isdir(data_file_path):
-    #         files = os.listdir(data_file_path)
-    #         if len(files) == 2:
-    #             file_endings = [file.split(".")[-1] for file in files]
-    #             if "yaml" in file_endings and "db3" in file_endings:
-    #                 return True, "Valid file"
-    #     else:
-    #         return False, "Invalid file"
-    
-    # @pyqtSlot()
-    # def load_next_data_file(self, load_first_image=True):
-    #     """Load the next data file in the list of data files.
-
-    #     Args:
-    #         load_first_image (bool): Whether to load the first image in the new data file
-    #     """
-    #     current_data_file_name = self.data_manager.current_data_file_name
-
-    #     if self.using_cached_data:
-    #         self.print_message("Cannot load next data file when using cached data")
-    #         return False
-
-    #     next_data_file_name = self.data_file_controls.get_next_data_file_name(current_data_file_name)
-
-    #     if next_data_file_name is None:
-    #         self.print_message("Reached the end of the data files")
-    #         return False
-
-    #     self.open_data_file(next_data_file_name, load_first_image)
-
-    #     return True, self.data_manager
 
     @pyqtSlot(bool)
     def reset_pf(self, use_ui_parameters=True):
@@ -470,7 +349,8 @@ class PfAppBags(PfAppBase):
         self.data_file_controls.open_data_file()
 
     def setup_trunk_data_connection(self):
-        self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
+        # self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
+        self.trunk_data_connection = TrunkDataConnectionRos2()
         self.trunk_data_connection.start()
         self.image_display_checkbox_changed()
         
@@ -542,10 +422,12 @@ class PfAppCached(PfAppBase):
         self.data_file_controls.open_data_file()
 
     def setup_trunk_data_connection(self):
-        self.trunk_data_connection = TrunkDataConnectionCachedData(self.parameters_data.cached_image_dir,
-                                                                   self.image_display.load_image)
+        self.trunk_data_connection = TrunkDataConnectionCachedData(self.parameters_data.cached_image_dir)
         
-        self.data_file_controls.set_image_display.connect(self.trunk_data_connection.get_trunk_data)
+        self.trunk_data_connection.start()
+        self.image_display_checkbox_changed()
+        
+        # self.data_file_controls.set_image_display.connect(self.trunk_data_connection.get_trunk_data)
 
     def init_widgets_unique(self):
         self.image_browsing_controls = ImageBrowsingControls()
@@ -590,19 +472,20 @@ class PfAppCached(PfAppBase):
         self.data_file_controls.set_img_number_label.connect(self.image_number_label.set_img_number_label)   
         
     def init_modes(self):
-        self.pf_tests_mode = PfModeCachedTests(self)
-        self.modes.append(self.pf_tests_mode)
         
         self.pf_mode = PfModeCached(self)
         self.modes.append(self.pf_mode)
         
+        self.pf_tests_mode = PfModeCachedTests(self)
+        self.modes.append(self.pf_tests_mode)        
         
         self.playback_mode = PlaybackMode(self)
         self.modes.append(self.playback_mode)
 
     def image_display_checkbox_changed(self):
+        self.trunk_data_connection.set_segmented_image_display_num(0)
         self.print_message("Cannot change image display settings when using cached data")
-        pass
+        
 
 
 
@@ -614,7 +497,8 @@ class PfAppLive(PfAppBase):
         self.parameters_data = ParametersLiveData()
 
     def setup_trunk_data_connection(self):
-        self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
+        self.trunk_data_connection = TrunkDataConnectionRos2()
+        self.trunk_data_connection.start()
         self.image_display_checkbox_changed()
 
     def init_widgets_unique(self):

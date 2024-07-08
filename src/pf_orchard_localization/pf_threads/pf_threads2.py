@@ -5,7 +5,7 @@ import time
 from ..utils.parameters import ParametersPf
 from ..pf_engine import PFEngine
 import inspect
-from ..visual_odom import OpticalFlowOdometer
+from ..visual_odom import OpticalFlowOdometerThread
 class PfBagThread(QThread):
     
     load_next_data_file = pyqtSignal(bool)
@@ -40,15 +40,19 @@ class PfBagThread(QThread):
         
         self.dt = 1 / self.fps
         
-        self.trunk_data_thread.signal_request_processed.connect(self.on_request_processed)
+        self.trunk_data_thread.signal_request_processed.connect(self.on_trunk_request_processed)
         
         self.trunk_data = None
         
-        self.visual_odometer = OpticalFlowOdometer()
-
-
-        self.mutex = QMutex()
-        self.condition = QWaitCondition()
+        self.visual_odom_thread = OpticalFlowOdometerThread()
+        self.visual_odom_thread.start()
+        self.visual_odom_thread.signal_request_processed.connect(self.on_visual_odom_request_processed)
+        
+        self.trunk_mutex = QMutex()
+        self.trunk_condition = QWaitCondition()
+        
+        self.odom_mutex = QMutex()
+        self.odom_condition = QWaitCondition()
         
         self.is_processing = False
         self.pf_active = False
@@ -125,19 +129,9 @@ class PfBagThread(QThread):
             pass
 
         elif current_msg['topic'] == 'image':
+            
             start_time = time.time()
-            x_odom = self.visual_odometer.get_odom_estimate(current_msg['rgb_image'], current_msg['depth_image'])
-            
-            if x_odom is not None:
-                u = np.array([[x_odom/self.dt], [0]])
-                num_readings = int(self.dt * 60)
-                self.pf_engine.motion_update(u, self.dt, num_readings=num_readings)
-                self.get_data_from_image_msg(current_msg)   
-            
-            print("Time to get handle image: ", time.time() - start_time)
-                
-
-                
+            self.get_data_from_image_msg(current_msg)
 
         self.is_processing = False
 
@@ -145,10 +139,19 @@ class PfBagThread(QThread):
         
         request = {"current_msg": current_msg}
         self.trunk_data_thread.handle_request(request)
+        self.visual_odom_thread.handle_request(request)
         
         self.trunk_data = None
+        self.x_odom = None
         
         self.wait_for_response()
+        
+        if self.x_odom != "returned_none":
+            u = np.array([[self.x_odom/self.dt], [0]])
+            num_readings = int(self.dt * 60)
+            self.pf_engine.motion_update(u, self.dt, num_readings=num_readings)
+        else:
+            return
         
         positions, widths, class_estimates, seg_img = self.trunk_data
 
@@ -177,17 +180,33 @@ class PfBagThread(QThread):
         self.check_convergence()
         
     def wait_for_response(self):
-        self.mutex.lock()
+        self.trunk_mutex.lock()
         if self.trunk_data is None:
-            self.condition.wait(self.mutex)
-        self.mutex.unlock()
+            self.trunk_condition.wait(self.trunk_mutex)
+        self.trunk_mutex.unlock()
+        
+        self.odom_mutex.lock()
+        if self.x_odom is None:
+            self.odom_condition.wait(self.odom_mutex)
+        self.odom_mutex.unlock()
+        
     
     @pyqtSlot(object)
-    def on_request_processed(self, trunk_data):
-        self.mutex.lock()
+    def on_trunk_request_processed(self, trunk_data):
+        self.trunk_mutex.lock()
         self.trunk_data = trunk_data
-        self.condition.wakeAll()
-        self.mutex.unlock()
+        self.trunk_condition.wakeAll()
+        self.trunk_mutex.unlock()
+    
+    @pyqtSlot(object)
+    def on_visual_odom_request_processed(self, x_odom):
+        self.odom_mutex.lock()
+        if x_odom is None:
+            self.x_odom = "returned_none"
+        else:
+            self.x_odom = x_odom
+        self.odom_condition.wakeAll()
+        self.odom_mutex.unlock()
         
     def get_odom_data(self, current_msg):
         odom_data = current_msg['data']
@@ -230,6 +249,7 @@ class PfCachedThread(PfBagThread):
         request = {"current_msg": current_msg}
         
         self.trunk_data_thread.handle_request(request)
+        self.visual_odom_thread.handle_request(request)
         
         self.trunk_data = None
         

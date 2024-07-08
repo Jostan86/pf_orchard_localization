@@ -160,7 +160,7 @@ class PFEngine:
 
         # Resample the particles
         self.resample_particles()
-
+        
     def motion_update(self, u: np.ndarray, dt: float, num_readings: int):
         """
         Propagate the particles forward in time using the motion model.

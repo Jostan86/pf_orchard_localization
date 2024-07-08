@@ -34,8 +34,9 @@ image_display_scale: 1.0
 # ----------------------
 # Jazz apple orchard
 # ----------------------
-width_estimation_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/width_estimation/config/width_estimation_jazz_config.yaml
-pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
+# width_estimation_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/width_estimation/config/width_estimation_jazz_config.yaml
+# pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
+pf_config_file_path: /pf_orchard_localization/config/parameters_pf.yaml
 
 #map_data_path: /media/jostan/MOAD/research_data/map_making_data/jazz_apple/map_data_jazz.json
 map_data_path: /media/jostan/portabits/pf_app_data/map_data_jazz_new.json

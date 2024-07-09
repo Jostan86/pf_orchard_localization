@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QTimer, QThread, QObject, pyqtSlot, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout
+from PyQt5.QtCore import QTimer, QThread, QObject, pyqtSlot, pyqtSignal
+from PyQt5.QtWidgets import QHBoxLayout
 import os
 import cv2
 

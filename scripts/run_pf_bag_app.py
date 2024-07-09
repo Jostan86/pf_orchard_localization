@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication
 import sys
 from pf_orchard_localization.app_managers import PfAppBags, PfAppCached, PfAppLive
 
@@ -23,6 +23,6 @@ pf_app = PfAppBags(bag_config_file_path)
 
 pf_app.show()
 
-sys.exit(app.exec())
+sys.exit(app.exec_())
 
 # 1.4cm/sec

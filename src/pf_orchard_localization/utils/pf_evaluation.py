@@ -6,7 +6,7 @@ import numpy as np
 import csv
 import os
 import time
-from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
 import copy
 
 class PfTest:

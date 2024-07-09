@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication
+from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication
 from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from cv_bridge import CvBridge

@@ -1,8 +1,8 @@
-from PyQt6.QtWidgets import (QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QApplication, QLineEdit, QCheckBox,
+from PyQt5.QtWidgets import (QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QApplication, QLineEdit, QCheckBox,
                              QPlainTextEdit, QMainWindow, QComboBox, QFileDialog, QInputDialog, QDialog, QSlider,
                              QListWidget, QMessageBox, QSpinBox)
-from PyQt6.QtGui import QImage, QPixmap, QGuiApplication
-from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QImage, QPixmap, QGuiApplication
+from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 import math
 import cv2
 import numpy as np
@@ -21,14 +21,19 @@ class PfMainWindow(QMainWindow):
     def init_window_display_settings(self):
         self.setGeometry(0, 0, 1700, 900)
 
-        # Access the primary screen
-        desktop = QGuiApplication.primaryScreen()
-        target_screen_number = 0
+        # # Access the primary screen
+        # desktop = QGuiApplication.primaryScreen()
+        # target_screen_number = 0
 
-        # Check the number of screens
-        screens = QGuiApplication.screens()
-        if target_screen_number < len(screens):
-            target_screen = screens[target_screen_number]
+        # # Check the number of screens
+        # screens = QGuiApplication.screens()
+        # if target_screen_number < len(screens):
+        #     target_screen = screens[target_screen_number]
+        #     self.move(target_screen.geometry().left(), target_screen.geometry().top())
+        desktop = QApplication.desktop()
+        target_screen_number = 0
+        if target_screen_number < desktop.screenCount():
+            target_screen = desktop.screen(target_screen_number)
             self.move(target_screen.geometry().left(), target_screen.geometry().top())
 
         logging.debug(f"Target screen number: {target_screen_number}")
@@ -67,7 +72,8 @@ class PfChangeParametersButton(QWidget):
 
             settings_dialog = PfSettingsDialog(current_settings=parameters_pf)
 
-            if settings_dialog.exec() == QDialog.DialogCode.Accepted:
+            # if settings_dialog.exec() == QDialog.DialogCode.Accepted: # Qt6
+            if settings_dialog.exec() == QDialog.Accepted:
                 new_settings = settings_dialog.get_settings()
                 if new_settings is None:
                     self.main_app_manager.print_message("Update Failed")
@@ -359,7 +365,8 @@ class ImageDisplay(QWidget):
         for i in range(self.num_camera_feeds):
             picture_label = QLabel(self)
             picture_label.resize(self.image_height, self.image_width)
-            picture_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            # picture_label.setAlignment(Qt.AlignmentFlag.AlignCenter) # Qt6
+            picture_label.setAlignment(Qt.AlignCenter)
             self.picture_labels.append(picture_label)
             self.picture_layout.addWidget(picture_label)
             self.load_image(img=None, img_num=i)
@@ -385,10 +392,14 @@ class ImageDisplay(QWidget):
         # Convert the image to a Qt image and display it
         image_cv2 = img
         image_rgb = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2RGB)
-        image_qt = QImage(image_rgb.data, image_rgb.shape[1], image_rgb.shape[0], QImage.Format.Format_RGB888)
+        # image_qt = QImage(image_rgb.data, image_rgb.shape[1], image_rgb.shape[0], QImage.Format.Format_RGB888) # Qt6
+        image_qt = QImage(image_rgb.data, image_rgb.shape[1], image_rgb.shape[0], QImage.Format_RGB888)
+        
         pixmap = QPixmap.fromImage(image_qt)
 
-        pixmap_scaled = pixmap.scaled(self.picture_labels[img_num].size(), Qt.AspectRatioMode.KeepAspectRatio)
+        # pixmap_scaled = pixmap.scaled(self.picture_labels[img_num].size(), Qt.AspectRatioMode.KeepAspectRatio) # Qt6
+        pixmap_scaled = pixmap.scaled(self.picture_labels[img_num].size(), Qt.KeepAspectRatio)
+        
         self.picture_labels[img_num].setPixmap(pixmap_scaled)
 
         QApplication.processEvents()
@@ -547,7 +558,9 @@ class ImageNumberLabel(QWidget):
         super().__init__()
 
         self.img_number_label = QLabel(self)
-        self.img_number_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # self.img_number_label.setAlignment(Qt.AlignmentFlag.AlignCenter) # Qt6
+        self.img_number_label.setAlignment(Qt.AlignCenter)
+        
 
         self.img_number_layout = QVBoxLayout()
         self.img_number_layout.addWidget(self.img_number_label)
@@ -572,12 +585,14 @@ class ImageDelaySlider(QWidget):
 
         start_value_ms = 0
 
-        self.slider = QSlider(Qt.Orientation.Horizontal)
+        # self.slider = QSlider(Qt.Orientation.Horizontal) # Qt6
+        self.slider = QSlider(Qt.Horizontal) 
         self.slider.setMinimum(0)
         self.slider.setMaximum(500)
         self.slider.setValue(start_value_ms)
         self.slider.setTickInterval(10)
-        self.slider.setTickPosition(QSlider.TickPosition.NoTicks)
+        # self.slider.setTickPosition(QSlider.TickPosition.NoTicks) # Qt6
+        self.slider.setTickPosition(QSlider.NoTicks)        
 
         self.value_label = QLabel(str(start_value_ms) + " ms")
 
@@ -804,10 +819,15 @@ class CachedDataCreator(QWidget):
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setText("File already exists")
             msg_box.setInformativeText("Do you want to overwrite the file?")
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            msg_box.setDefaultButton(QMessageBox.StandardButton.No)
+            # msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) # Qt6
+            # msg_box.setDefaultButton(QMessageBox.StandardButton.No)
+            # ret = msg_box.exec()
+            # if ret == QMessageBox.StandardButton.No:
+                # return
+            msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            msg_box.setDefaultButton(QMessageBox.No)
             ret = msg_box.exec()
-            if ret == QMessageBox.StandardButton.No:
+            if ret == QMessageBox.No:
                 return
 
         with open(save_location, 'w') as f:

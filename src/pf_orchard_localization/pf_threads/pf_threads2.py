@@ -1,5 +1,5 @@
 from ..utils.pf_evaluation import PfTestExecutor
-from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QMutex, QWaitCondition
 import numpy as np
 import time
 from ..utils.parameters import ParametersPf

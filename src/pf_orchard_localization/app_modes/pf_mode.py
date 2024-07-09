@@ -1,4 +1,4 @@
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, QObject
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject
 from ..utils import PfTestExecutorQt
 from ..pf_threads import PfBagThread, PfCachedThread, PfTestExecutorQt
         

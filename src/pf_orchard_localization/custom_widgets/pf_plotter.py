@@ -2,9 +2,9 @@
 
 import pyqtgraph as pg
 import time
-from PyQt6.QtCore import pyqtSignal, Qt, QPointF, QThread, pyqtSlot
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton
-from PyQt6.QtGui import QMouseEvent
+from PyQt5.QtCore import pyqtSignal, Qt, QPointF, QThread, pyqtSlot
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton
+from PyQt5.QtGui import QMouseEvent
 import numpy as np
 from map_data_tools import MapData
 
@@ -19,14 +19,26 @@ class ClickablePlotWidget(pg.PlotWidget):
         super().__init__(*args, **kwargs)
         self.is_repainting = False
 
-    def mousePressEvent(self, event: QMouseEvent):
-        # Convert QPoint to QPointF
-        mouse_point = self.plotItem.vb.mapSceneToView(QPointF(event.pos()))
+    # def mousePressEvent(self, event: QMouseEvent): # Qt6
+    #     # Convert QPoint to QPointF
+    #     mouse_point = self.plotItem.vb.mapSceneToView(QPointF(event.pos()))
+    #     x = mouse_point.x()
+    #     y = mouse_point.y()
+
+    #     # Check if Shift key is pressed
+    #     if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+    #         self.clicked.emit(x, y, True)
+    #     else:
+    #         self.clicked.emit(x, y, False)
+
+    #     super().mousePressEvent(event)
+    def mousePressEvent(self, event):
+        mouse_point = self.plotItem.vb.mapSceneToView(event.pos())
         x = mouse_point.x()
         y = mouse_point.y()
 
         # Check if Shift key is pressed
-        if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+        if event.modifiers() & Qt.ShiftModifier:
             self.clicked.emit(x, y, True)
         else:
             self.clicked.emit(x, y, False)

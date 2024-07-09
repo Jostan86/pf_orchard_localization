@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import sys
 from dataclasses import fields
-from PyQt6.QtCore import pyqtSlot
-from PyQt6.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QWidget
-from PyQt6.QtGui import QSurfaceFormat
+from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QWidget
+from PyQt5.QtGui import QSurfaceFormat
 from ..custom_widgets import (PfMainWindow, PfControlButtons, PfStartLocationControls, PfCheckBoxes,
                               Console, ImageDisplay, PfModeSelector, ImageBrowsingControls, TreatingPFPlotter,
                               DataFileControls, ImageNumberLabel, ImageDelaySlider, CachedDataCreator,

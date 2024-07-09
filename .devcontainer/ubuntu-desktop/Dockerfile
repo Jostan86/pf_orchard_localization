@@ -21,13 +21,14 @@ USER $USERNAME
 RUN sudo usermod --append --groups video $USERNAME
 
 RUN sudo apt-get update 
-RUN sudo apt-get install -y git python3-pip libxcb-cursor0
-    # git \
-    # # python3-pyqt5 \
-    # python3-pip \
+RUN sudo apt-get install -y \
+    git \
+    python3-pyqt5 \
+    python3-pip \
+    libxcb-cursor0 && \
     # # libboost-python-dev \
     # # libgl1-mesa-glx \
-    # && rm -rf /var/lib/apt/lists/*
+    sudo rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip
 
@@ -38,7 +39,7 @@ RUN pip install \
     scipy \
     scikit-image  \
     rosbags \
-    PyQt6 \
+    # PyQt6 \
     utm 
 
 RUN pip install numpy==1.26.4

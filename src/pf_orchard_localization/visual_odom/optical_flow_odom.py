@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from scipy.ndimage import median_filter
 import time
-from PyQt6.QtCore import QThread, pyqtSignal, QObject, QMutex, QWaitCondition, pyqtSlot
+from PyQt5.QtCore import QThread, pyqtSignal, QObject, QMutex, QWaitCondition, pyqtSlot
 
 class OpticalFlowOdometerThread(QThread):
     signal_request_processed = pyqtSignal(object)

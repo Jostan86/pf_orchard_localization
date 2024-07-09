@@ -1,8 +1,8 @@
 import csv
 import os
 import numpy as np
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpinBox, QFileDialog, QMessageBox
-from PyQt6.QtCore import pyqtSignal, pyqtSlot
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpinBox, QFileDialog, QMessageBox
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from ..utils.pf_evaluation import PfTestRegimen
 
 class PfTestControls(QWidget):

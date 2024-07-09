@@ -1,5 +1,5 @@
 import sys
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image

@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QComboBox, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QLineEdit
-from PyQt6.QtCore import pyqtSignal, pyqtSlot
+from PyQt5.QtWidgets import QWidget, QComboBox, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QLineEdit
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
 import os
 import logging
 from ..recorded_data_loaders import Bag2DataLoader, CachedDataLoader

@@ -1,19 +1,6 @@
-FROM dustynv/ros:noetic-desktop-l4t-r35.4.1
+FROM this_container:l4t-r36.3.0
 
 USER root
-
-# Install stuff, if you have any
-RUN apt-get update \
-    && apt-get install -y \
-    git \
-    python3-rostopic \
-    python3-rosmsg \
-    python3-pyqt5 \
-    libboost-python-dev \
-    ros-noetic-nav-msgs \
-    ros-noetic-sensor-msgs \
-    libgl1-mesa-glx \
-    && rm -rf /var/lib/apt/lists/*
 
 # Add vscode user with same UID and GID as your host system
 # (copied from https://code.visualstudio.com/remote/advancedcontainers/add-nonroot-user#_creating-a-nonroot-user)
@@ -39,25 +26,67 @@ USER $USERNAME
 # Add user to video group to allow access to webcam
 RUN sudo usermod --append --groups video $USERNAME
 
+RUN sudo apt-get update && \
+    sudo apt-get install -y --no-install-recommends \
+    git \
+    python3-pyqt5 \
+    python3-pip \
+    libgl1-mesa-glx && \
+    sudo apt-get clean && \
+    sudo rm -rf /var/lib/apt/lists/*
+
+RUN pip install \
+    matplotlib \
+    opencv-python-headless \
+    pyqtgraph \
+    scipy \
+    scikit-image  \
+    rosbags \
+    utm 
+
+RUN pip install numpy==1.26.4
+
 # Update all packages
 # RUN sudo apt update && sudo apt upgrade -y
 
 # Rosdep update
-RUN rosdep update
+# RUN rosdep update
+
+# Create a directory for external repositories
+RUN mkdir -p ~/my_python_packages
+
+# Install map_data_tools
+RUN git clone https://github.com/Jostan86/map_data_tools.git ~/my_python_packages/map_data_tools
+RUN pip install ~/my_python_packages/map_data_tools
 
 # Set up environment variables
-ENV CATKIN_WS=/home/$USERNAME/catkin_ws
-ENV ROS_DISTRO=noetic
+ARG ROS2_WS=/home/$USERNAME/ros2_ws
+ARG ROS_DISTRO=humble
 
-# Clone the vision_opencv repository into the workspace
-RUN git clone https://github.com/ros-perception/vision_opencv.git -b noetic ${CATKIN_WS}/src/vision_opencv
+# Make a ros2 workspace
+RUN mkdir -p ${ROS2_WS}/src
 
-RUN /bin/bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && cd ${CATKIN_WS} && catkin_make"
+# Clone the interface pacakge into the workspace
+RUN cd ${ROS2_WS}/src && git clone https://github.com/Jostan86/pf_orchard_interfaces.git
+
+# Build the workspace
+RUN cd ~/ros2_ws && . /opt/ros/${ROS_DISTRO}/install/setup.sh && colcon build
+
+RUN mkdir -p ~/tmp/runtime-${USER}
+RUN chmod -R 700 ~/tmp/runtime-${USER}
 
 # Source the ROS setup file
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
-RUN echo "source ${CATKIN_WS}/devel/setup.bash" >> ~/.bashrc
-RUN echo "export DISPLAY=:0" >> ~/.bashrc
-RUN echo "export REMOTE_CONTAINERS_DISPLAY_SOCK=/tmp/.X11-unix/X0" >> ~/.bashrc
+RUN echo "source /opt/ros/${ROS_DISTRO}/install/setup.bash" >> ~/.bashrc
+RUN echo "source ${ROS2_WS}/install/setup.bash" >> ~/.bashrc
+# RUN echo "export DISPLAY=:0" >> ~/.bashrc
+# RUN echo "export REMOTE_CONTAINERS_DISPLAY_SOCK=/tmp/.X11-unix/X0" >> ~/.bashrc
+RUN echo  "export XDG_RUNTIME_DIR=/tmp/runtime-${USER}" >> ~/.bashrc
 
 USER root
+
+
+
+
+
+
+

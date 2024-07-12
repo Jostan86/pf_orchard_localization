@@ -130,7 +130,6 @@ class PfBagThread(QThread):
 
         elif current_msg['topic'] == 'image':
             
-            start_time = time.time()
             self.get_data_from_image_msg(current_msg)
 
         self.is_processing = False
@@ -180,11 +179,13 @@ class PfBagThread(QThread):
         self.check_convergence()
         
     def wait_for_response(self):
+        # Wait for trunk data 
         self.trunk_mutex.lock()
         if self.trunk_data is None:
             self.trunk_condition.wait(self.trunk_mutex)
         self.trunk_mutex.unlock()
         
+        # Trunk data is in, now wait for odom data if it is not already in
         self.odom_mutex.lock()
         if self.x_odom is None:
             self.odom_condition.wait(self.odom_mutex)

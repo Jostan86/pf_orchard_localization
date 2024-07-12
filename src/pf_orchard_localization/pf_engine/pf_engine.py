@@ -140,7 +140,6 @@ class PFEngine:
     def scan_update(self, tree_msg):
         """Handle the tree message. This will be called every time a tree message is received."""
 
-
         if tree_msg['positions'] is not None:
 
             postions_sense = np.array(tree_msg['positions'])

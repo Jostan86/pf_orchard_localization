@@ -59,7 +59,7 @@ RUN pip install ~/my_python_packages/map_data_tools
 
 # Make a ros2 workspace
 RUN mkdir -p ~/ros2_ws/src
-RUN cd ~/ros2_ws/src && git clone https://github.com/Jostan86/pf_orchard_interfaces.git
+RUN cd ~/ros2_ws/src && git clone https://github.com/Jostan86/pf_orchard_interfaces.git 
 
 # Build the workspace
 RUN cd ~/ros2_ws && . /opt/ros/humble/setup.sh && colcon build

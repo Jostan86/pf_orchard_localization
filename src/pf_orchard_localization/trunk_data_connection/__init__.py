@@ -2,7 +2,7 @@ from .trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCache
 
 # only import the ROS2 classes if ROS2 is available
 try:
-    from .trunk_data_connection_ros2 import TrunkDataConnectionRos2
+    from .trunk_data_connection_ros import TrunkDataConnectionRosService, TrunkDataConnectionRosSub
 except ImportError:
-    print("Unable to import TrunkDataConnectionRos2, ROS2 is likely not installed")
+    print("Unable to import TrunkDataConnectionRosService, ROS2 is likely not installed")
     pass

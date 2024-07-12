@@ -7,13 +7,12 @@ from PyQt5.QtGui import QSurfaceFormat
 from ..custom_widgets import (PfMainWindow, PfControlButtons, PfStartLocationControls, PfCheckBoxes,
                               Console, ImageDisplay, PfModeSelector, ImageBrowsingControls, TreatingPFPlotter,
                               DataFileControls, ImageNumberLabel, ImageDelaySlider, CachedDataCreator,
-                              PfChangeParametersButton, PfTestControls, PfQueueSizeLabel, RosConnectButton,
-                              CalibrationDataControls)
+                              PfChangeParametersButton, PfTestControls, PfQueueSizeLabel, CalibrationDataControls)
 from ..utils.parameters import ParametersPf, ParametersBagData, ParametersCachedData, ParametersLiveData
 from ..pf_engine import PFEngine
 from map_data_tools import MapData
 import logging
-from ..trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCachedData, TrunkDataConnectionRos2
+from ..trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCachedData, TrunkDataConnectionRosService, TrunkDataConnectionRosSub
 from ..app_modes import PfMode, PfModeCached, PfModeCachedTests, PlaybackMode, PfLiveMode, PfModeSaveCalibrationData
 import os
 from functools import partial
@@ -34,7 +33,7 @@ class PfAppBase(PfMainWindow):
         super().__init__()
 
         # Initialize parameters
-        self.init_data_parameters(config_file_path)
+        self.init_data_parameters()
         self.parameters_data.load_from_yaml(config_file_path)
         self.parameters_pf = ParametersPf()
         self.parameters_pf.load_from_yaml(self.parameters_data.pf_config_file_path)
@@ -65,7 +64,7 @@ class PfAppBase(PfMainWindow):
 
         self.mode_changed()
 
-    def init_data_parameters(self, config_file_path: str):
+    def init_data_parameters(self):
         """
         Initialize the data parameters
 
@@ -112,7 +111,6 @@ class PfAppBase(PfMainWindow):
         self.change_parameters_button = PfChangeParametersButton(self)
         self.mode_selector = PfModeSelector()
         self.image_display = ImageDisplay(num_camera_feeds=1, scale_factor=1.0)
-        self.image_browsing_controls = ImageBrowsingControls()
         self.console = Console()
 
         # Setup the checkboxes
@@ -165,9 +163,6 @@ class PfAppBase(PfMainWindow):
         self.trunk_data_connection.signal_unfiltered_image.connect(self.image_display.load_image)
         self.trunk_data_connection.signal_original_image.connect(self.image_display.load_image)
         self.trunk_data_connection.signal_print_message.connect(self.print_message)
-        
-        self.data_file_controls.set_image_display.connect(self.trunk_data_connection.handle_request)
-        
 
         self.connect_app_to_ui_unique()
 
@@ -342,7 +337,7 @@ class PfAppBags(PfAppBase):
         super().__init__(config_file_path, logging_level=logging_level)
 
 
-    def init_data_parameters(self, config_file_path):
+    def init_data_parameters(self):
         self.parameters_data = ParametersBagData()
     
     def init_loaded_data(self):
@@ -350,7 +345,7 @@ class PfAppBags(PfAppBase):
 
     def setup_trunk_data_connection(self):
         # self.trunk_data_connection = TrunkDataConnection(self.parameters_data.width_estimation_config_file_path)
-        self.trunk_data_connection = TrunkDataConnectionRos2()
+        self.trunk_data_connection = TrunkDataConnectionRosService()
         self.trunk_data_connection.start()
         self.image_display_checkbox_changed()
         
@@ -391,6 +386,8 @@ class PfAppBags(PfAppBase):
         self.main_layout.addWidget(self.plotter)
         
     def connect_app_to_ui_unique(self):
+        self.data_file_controls.set_image_display.connect(self.trunk_data_connection.handle_request)
+
         self.data_file_controls.data_file_controls_message.connect(self.print_message)
         self.data_file_controls.reset_pf.connect(self.reset_pf)
         self.data_file_controls.set_img_number_label.connect(self.image_number_label.set_img_number_label)        
@@ -415,7 +412,7 @@ class PfAppCached(PfAppBase):
             raise FileNotFoundError("Invalid test_start_info_path given in config file")
             
 
-    def init_data_parameters(self, config_file_path):
+    def init_data_parameters(self):
         self.parameters_data = ParametersCachedData()
     
     def init_loaded_data(self):
@@ -467,6 +464,8 @@ class PfAppCached(PfAppBase):
         self.main_layout.addWidget(self.plotter)
     
     def connect_app_to_ui_unique(self):
+        self.data_file_controls.set_image_display.connect(self.trunk_data_connection.handle_request)
+
         self.data_file_controls.data_file_controls_message.connect(self.print_message)
         self.data_file_controls.reset_pf.connect(self.reset_pf)
         self.data_file_controls.set_img_number_label.connect(self.image_number_label.set_img_number_label)   
@@ -493,19 +492,28 @@ class PfAppLive(PfAppBase):
     def __init__(self, config_file_path, logging_level=logging.DEBUG):
         super().__init__(config_file_path, logging_level=logging_level)
 
-    def init_data_parameters(self, config_file_path):
+    def init_data_parameters(self):
         self.parameters_data = ParametersLiveData()
 
     def setup_trunk_data_connection(self):
-        self.trunk_data_connection = TrunkDataConnectionRos2()
+        # self.trunk_data_connection = TrunkDataConnectionRosService()
+        # self.trunk_data_connection.start()
+        self.trunk_data_connection = TrunkDataConnectionRosSub()
+        self.image_display_checkbox_changed(init=True)
         self.trunk_data_connection.start()
-        self.image_display_checkbox_changed()
+    
+    def image_display_checkbox_changed(self, init=False):
+        if not init:
+            self.print_message("Cannot change image display settings when using live data")
+            
+        self.checkboxes.show_rgb_image_checkbox.setChecked(True)
+        self.checkboxes.show_pre_filtered_segmentation_checkbox.setChecked(False)
+        super().image_display_checkbox_changed()
 
     def init_widgets_unique(self):
         self.queue_size_label = PfQueueSizeLabel()
-        self.ros_connect_button = RosConnectButton()
 
-        self.widget_list += [self.queue_size_label, self.ros_connect_button]
+        self.widget_list += [self.queue_size_label]
     
     def draw_ui(self):
         mode_change_button_layout = QHBoxLayout()
@@ -518,16 +526,20 @@ class PfAppLive(PfAppBase):
         self.ui_layout.addWidget(self.checkboxes)
         self.ui_layout.addWidget(self.start_location_controls)
         self.ui_layout.addWidget(self.control_buttons)
-        self.ui_layout.addWidget(self.ros_connect_button)
         self.ui_layout.addWidget(self.queue_size_label)
         self.ui_layout.addWidget(self.image_display)
-        self.ui_layout.addWidget(self.image_browsing_controls)
         self.ui_layout.addWidget(self.console)
         
         self.main_layout.addLayout(self.ui_layout)
         self.main_layout.addWidget(self.plotter)
+        
+        self.checkboxes.show_pre_filtered_segmentation_checkbox.hide()
+        self.checkboxes.show_rgb_image_checkbox.hide()
     
 
+    def connect_app_to_ui_unique(self):
+        pass
+    
     def init_modes(self):
         self.pf_live_mode = PfLiveMode(self)
         self.modes.append(self.pf_live_mode)

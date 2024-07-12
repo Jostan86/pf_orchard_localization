@@ -642,41 +642,7 @@ class PfQueueSizeLabel(QWidget):
     def enable(self):
         self.queue_size_label.setDisabled(False)
 
-class RosConnectButton(QWidget):
-    disconnectButtonClicked = pyqtSignal()
-    connectButtonClicked = pyqtSignal()
 
-    def __init__(self):
-        super().__init__()
-
-        self.connect_button = QPushButton("Connect to ROS")
-        self.connect_button.setToolTip("Connect to ROS")
-        self.connect_button_layout = QVBoxLayout()
-        self.connect_button_layout.addWidget(self.connect_button)
-
-        self.connect_button.clicked.connect(self.connect_button_clicked)
-
-        self.setLayout(self.connect_button_layout)
-
-    def set_disconnected(self):
-        self.connect_button.setText("Connect to ROS")
-        self.connect_button.setToolTip("Connect to ROS")
-
-    def set_connected(self):
-        self.connect_button.setText("Disconnect from ROS")
-        self.connect_button.setToolTip("Disconnect from ROS")
-
-    def connect_button_clicked(self):
-        if self.connect_button.text() == "Connect to ROS":
-            self.connectButtonClicked.emit()
-        else:
-            self.disconnectButtonClicked.emit()
-
-    def disable(self):
-        self.connect_button.setDisabled(True)
-
-    def enable(self):
-        self.connect_button.setDisabled(False)
 
 class CachedDataCreator(QWidget):
     def __init__(self, main_app_manager):

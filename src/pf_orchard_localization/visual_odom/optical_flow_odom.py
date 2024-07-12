@@ -206,13 +206,14 @@ if __name__=="__main__":
 
         start_time = time.time()
         of_estimate = optical_flow_estimator.get_odom_estimate(rgb, depth)
+        print("Time to estimate movement: {}".format(time.time() - start_time))
         
         if of_estimate is None:
             time_stamp_part = image_name.split(".")[0]
             time_stamp = int(time_stamp_part.split("_")[0]) + int(time_stamp_part.split("_")[1]) / 1e9
             continue
         
-        print("Time to estimate movement: {}".format(time.time() - start_time))
+        
         time_stamp_previous = time_stamp
         time_stamp_part = image_name.split(".")[0]
         time_stamp = int(time_stamp_part.split("_")[0]) + int(time_stamp_part.split("_")[1]) / 1e9
@@ -225,7 +226,7 @@ if __name__=="__main__":
 
         # print the translation vector with two decimal places
         np.set_printoptions(precision=2, suppress=True)
-        print("Optical flow estimate:\n {}".format(of_estimate))
+        print("Optical flow estimate: {}".format(of_estimate))
 
         # cv2.imshow("RGB Image 1", rgb_1)
         cv2.imshow("RGB Image 2", rgb)

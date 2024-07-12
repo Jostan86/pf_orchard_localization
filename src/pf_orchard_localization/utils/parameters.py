@@ -103,7 +103,6 @@ class ParametersLiveData(Parameters):
     rgb_topic: str = None
     odom_topic: str = None
 
-    width_estimation_config_file_path: str = None
     pf_config_file_path: str = None
     map_data_path: str = None
 

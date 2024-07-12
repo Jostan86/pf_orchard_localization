@@ -1,0 +1,4 @@
+This is the command i used to build the image for this project:
+jetson-containers build --name=this_container pytorch tensorflow2 onnxruntime ros:humble-desktop
+
+It took quite a long time

@@ -6,7 +6,7 @@ start_pose_center_y: 12.42  # meters
 particle_density: 200  # particles / m^2
 
 # Size and orientation of the square shaped area where particles are initially placed
-start_width: 4.0  # meters
+start_width: 10.0  # meters
 start_height: 20.0  # meters
 start_rotation: -32.0  # degrees
 

@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  optical_flow_odom:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.jetson
+    volumes:
+      - ../:/home/vscode/pf_orchard_localization:rw
+      - /home/jostan/Documents/app_data:/home/vscode/app_data:rw
+    privileged: true
+    network_mode: "host"
+    runtime: nvidia
+    ipc: "host"
+    environment:
+      - DISPLAY
+    user: vscode
+    command: ["python3", "/home/vscode/pf_orchard_localization/src/pf_orchard_localization/visual_odom/optical_flow_odom_ros_node.py"]
+

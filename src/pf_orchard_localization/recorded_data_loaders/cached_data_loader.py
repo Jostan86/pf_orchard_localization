@@ -3,13 +3,29 @@ import json
 from pf_orchard_localization.recorded_data_loaders import BaseDataLoader
 
 class CachedDataLoader(BaseDataLoader):
+    """
+    Data loader for cached data files. The data loader reads the data from the cached data file and provides the data to the
+    rest of the system. The data loader should be able to provide the data in the order it was recorded, and be able to skip to a
+    specific time stamp in the data.
+    """
+
     def __init__(self, file_path):
+        """
+        Args:
+            file_path (str): The path to the cached data file
+        """
         super().__init__()
         # self.time_stamps_keys = []
 
         self.open_file(file_path)
 
     def open_file(self, file_path):
+        """
+        Open the cached data file and load the data into the data loader
+
+        Args:
+            file_path (str): The path to the cached data file
+        """
         self.current_data_file_path = file_path
 
         t_start = None

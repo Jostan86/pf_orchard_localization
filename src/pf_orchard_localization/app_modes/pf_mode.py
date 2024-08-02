@@ -3,12 +3,17 @@ from ..utils import PfTestExecutorQt
 from ..pf_threads import PfBagThread, PfCachedThread, PfTestExecutorQt
         
     
-class PfMode(QObject):
+class PfRecordedDataMode(QObject):
+    """
+    This class handles the Recorded Data Mode of the application. The Recorded Data Mode is used to run the particle filter on ros2 bag data.
+    """
     
     stop_pf_signal = pyqtSignal()
     
     def __init__(self, main_app_manager):
-        
+        """
+        Initialize the mode
+        """        
         self.main_app_manager = main_app_manager
 
         self.mode_active = False
@@ -22,13 +27,18 @@ class PfMode(QObject):
         super().__init__()
 
     def ensure_pf_stopped(self):
+        """
+        Ensures that the particle filter thread is stopped
+        """
         if self.thread_deleted:
             return 
         
         self.stop_button_clicked()
 
     def enable_disable_widgets(self, enable):
-
+        """
+        Enables/disables the widgets in the GUI when the PF thread is running
+        """
         self.main_app_manager.mode_selector.setEnabled(enable)
         self.main_app_manager.change_parameters_button.setEnabled(enable)
         
@@ -48,12 +58,21 @@ class PfMode(QObject):
         self.enable_disable_widgets_unique(enable)
     
     def enable_disable_widgets_unique(self, enable):
+        """
+        Enables or disables the widgets that are unique to this mode when the PF thread is running, subclasses should override this method
+        """
         self.main_app_manager.cached_data_creator.enable_checkbox.setEnabled(enable)
         
     def start_pf(self, single_image):     
-        
+        """
+        Starts the particle filter thread
+
+        Args:
+            single_image: bool: True to run one image then stop, False to run continuously
+        """        
         self.thread_deleted = False
         
+
         if not single_image:   
             self.enable_disable_widgets(enable=False)
              
@@ -64,6 +83,7 @@ class PfMode(QObject):
                                      stop_when_converged=self.main_app_manager.parameters_pf.stop_when_converged,
                                      only_single_image=single_image,
                                      added_delay=self.main_app_manager.image_delay_slider.get_delay_ms()/1000,
+                                     image_fps=self.main_app_manager.parameters_data.image_fps,
                                      cache_data_enabled=self.main_app_manager.cached_data_creator.cache_data_enabled)
         
         self.pf_thread.load_next_data_file.connect(self.main_app_manager.data_file_controls.load_next_data_file)
@@ -85,6 +105,9 @@ class PfMode(QObject):
         self.pf_thread.start()        
         
     def thread_clean_up(self):
+        """
+        Cleans up the particle filter thread after it has finished
+        """
         
         self.pf_thread.wait()
         
@@ -93,6 +116,9 @@ class PfMode(QObject):
         self.enable_disable_widgets(enable=True)
 
     def activate_mode(self):
+        """
+        Activates the recorded data mode
+        """
         self.mode_active = True
 
         self.setup_gui()
@@ -101,6 +127,9 @@ class PfMode(QObject):
         self.main_app_manager.reset_pf()
 
     def setup_gui(self):
+        """
+        Sets up the GUI for the mode
+        """
 
         self.main_app_manager.mode_selector.show()
         self.main_app_manager.change_parameters_button.show()
@@ -120,10 +149,16 @@ class PfMode(QObject):
     
     @pyqtSlot()
     def thread_deleted_slot(self):
+        """
+        Slot to handle when the thread is deleted, connected to the destroyed signal of the particle filter thread
+        """
         self.thread_deleted = True
         
     @pyqtSlot()
     def start_button_clicked(self):
+        """
+        Slot to handle the start button clicked signal, starts the particle filter thread
+        """
         if not self.thread_deleted:
             return
         
@@ -131,6 +166,9 @@ class PfMode(QObject):
     
     @pyqtSlot()
     def continue_button_clicked(self):
+        """
+        Slot to handle the continue button clicked signal, sends one image through the particle filter 
+        """
         if not self.thread_deleted:
             return
         
@@ -138,24 +176,36 @@ class PfMode(QObject):
     
     @pyqtSlot()
     def stop_button_clicked(self):
+        """
+        Slot to handle the stop button clicked signal, stops the particle filter thread if it's running
+        """
         if self.thread_deleted:
             return
         
         self.stop_pf_signal.emit()
         
     def connect_gui(self):
+        """
+        Connects the GUI signals to the slots for the recorded data mode
+        """
         self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_button_clicked)
         self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_button_clicked)
         self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.continue_button_clicked)
         
     
     def disconnect_gui(self):
+        """
+        Disconnects the GUI signals from the slots for the recorded data mode
+        """
         self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_button_clicked)
         self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_button_clicked)
         self.main_app_manager.control_buttons.single_step_button.clicked.disconnect(self.continue_button_clicked)
         self.main_app_manager.cached_data_creator.enable_checkbox.setChecked(False)
     
     def deactivate_mode(self):
+        """
+        Deactivates the recorded data mode
+        """
         if not self.mode_active:
             return
 
@@ -164,20 +214,39 @@ class PfMode(QObject):
         self.mode_active = False
 
         self.ensure_pf_stopped()
-
-    
+   
 
     def shutdown_hook(self):
+        """
+        Hook to run when the application is shutting down, ensures the particle filter thread is stopped
+        """
         self.ensure_pf_stopped()
 
-class PfModeCached(PfMode):
+class PfModeCached(PfRecordedDataMode):
+    """
+    This class handles the Cached Data Mode of the application. The Cached Data Mode is used to run the particle filter on data where the results of the odometry and image
+    processing have been cached and loaded to avoid processing the same data repeatedly when testing the particle filter.
+    """
     def __init__(self, main_app_manager):
+        """
+        Initialize the mode, extends the parent class method to set the mode name 
+        """
         super().__init__(main_app_manager)
-    
+        self.mode_name = "PF - Cached Data"
+
     def enable_disable_widgets_unique(self, enable):
+        """
+        Enables or disables the widgets that are unique to this mode when the PF thread is running. Overrides the method in the parent class. There are no unique widgets for this mode.
+        """
         pass
 
     def start_pf(self, single_image):     
+        """
+        Starts the particle filter thread. Overrides the method in the parent class.
+
+        Args:
+            single_image: bool: True to run one image then stop, False to run continuously
+        """
         
         self.thread_deleted = False
         
@@ -212,8 +281,9 @@ class PfModeCached(PfMode):
         self.pf_thread.start()        
                 
     def setup_gui(self):
-        
-        
+        """
+        Sets up the GUI for the cached data mode. Overrides the method in the parent class.
+        """        
         self.main_app_manager.mode_selector.show()
         self.main_app_manager.change_parameters_button.show()
         self.main_app_manager.image_delay_slider.show()
@@ -227,14 +297,26 @@ class PfModeCached(PfMode):
         self.main_app_manager.plotter.show()
 
 class PfModeCachedTests(PfModeCached):
+    """
+    This class handles the Cached Data Tests Mode of the application. The Cached Data Tests Mode is used to run the particle filter repeatedly on cached data and test the results.
+    """
     
     def __init__(self, main_app_manager):
         super().__init__(main_app_manager)
-        self.mode_name = "PF - Recorded Data Tests"
+        """
+        Initialize the mode, extends the parent class method to set the mode name 
+        """
+        self.mode_name = "PF - Cached Data Tests"
         
         self.running_all_tests = False
     
     def start_pf(self, load_data_only=False):
+        """
+        Starts the particle filter thread. Overrides the method in the parent class.
+
+        Args:
+            load_data_only: bool: True to just load the data, False to run the particle filter
+        """
         
         self.thread_deleted = False
         
@@ -257,7 +339,6 @@ class PfModeCachedTests(PfModeCached):
                                           test_index=test_index,
                                           load_data_only=load_data_only,)
         
-        #TODO connection galore
         self.pf_thread.reset_pf_app.connect(self.main_app_manager.reset_pf)
         self.pf_thread.update_test_number.connect(self.main_app_manager.pf_test_controls.update_test_number)
         self.pf_thread.update_trial_number.connect(self.main_app_manager.pf_test_controls.update_trial_number)
@@ -276,8 +357,11 @@ class PfModeCachedTests(PfModeCached):
         
         self.pf_thread.start()
         
-                
+    @pyqtSlot() 
     def run_all_tests(self):
+        """
+        Slot to handle the run all tests signal, starts the particle filter thread to run all the tests
+        """
         if not self.thread_deleted:
             return
         
@@ -285,7 +369,11 @@ class PfModeCachedTests(PfModeCached):
         
         self.start_pf()
     
+    @pyqtSlot()
     def run_selected_test(self):
+        """
+        Slot to handle the run selected test signal, starts the particle filter thread to run the selected test
+        """
         if not self.thread_deleted:
             return
         
@@ -293,7 +381,11 @@ class PfModeCachedTests(PfModeCached):
         
         self.start_pf()
     
+    @pyqtSlot()
     def load_data_only(self):
+        """
+        Slot to handle the load data only signal, starts the particle filter thread but just loads the test data
+        """
         if not self.thread_deleted:
             return
         
@@ -302,7 +394,9 @@ class PfModeCachedTests(PfModeCached):
         self.start_pf(load_data_only=True)
     
     def enable_disable_widgets(self, enable):
-
+        """
+        Enables/disables the widgets in the GUI when the PF thread is running, overrides the method in PfRecordedDataMode.
+        """
         self.main_app_manager.mode_selector.setEnabled(enable)
         self.main_app_manager.change_parameters_button.setEnabled(enable)
         
@@ -315,6 +409,9 @@ class PfModeCachedTests(PfModeCached):
         
 
     def setup_gui(self):
+        """
+        Sets up the GUI for the cached data tests mode. Overrides the method in the parent class.
+        """
         
         self.main_app_manager.mode_selector.show()
         self.main_app_manager.change_parameters_button.show()
@@ -331,6 +428,9 @@ class PfModeCachedTests(PfModeCached):
 
 
     def connect_gui(self):
+        """
+        Connects the GUI signals to the slots for the cached data tests mode, overrides the method in PfRecordedDataMode.
+        """
 
         self.main_app_manager.pf_test_controls.runAllTestsClicked.connect(self.run_all_tests)
         self.main_app_manager.pf_test_controls.abortAllTestsClicked.connect(self.stop_button_clicked)
@@ -342,22 +442,31 @@ class PfModeCachedTests(PfModeCached):
         self.main_app_manager.data_file_controls.setEnabled(False)
 
     def activate_mode(self):
+        """
+        Activates the cached data tests mode, extends the method in PfRecordedDataMode.
+        """
+
         super().activate_mode()
         
         self.main_app_manager.pf_test_controls.load_pf_test_names()
         
         self.load_data_only()
-        
-        # load the first test
 
     def deactivate_mode(self):
+        """
+        Deactivates the cached data tests mode, overrides the method in PfRecordedDataMode.
+        """
         self.disconnect_gui()
-
+        """
+        Deactivates the cached data tests mode, overrides the method in PfRecordedDataMode.
+        """
         self.mode_active = False
         self.stop_button_clicked()
 
     def disconnect_gui(self):
-
+        """
+        Disconnects the GUI signals from the slots for the cached data tests mode, overrides the method in PfRecordedDataMode.
+        """
         # disconnect signals
         self.main_app_manager.pf_test_controls.runAllTestsClicked.disconnect(self.run_all_tests)
         self.main_app_manager.pf_test_controls.abortAllTestsClicked.disconnect(self.stop_button_clicked)
@@ -369,15 +478,25 @@ class PfModeCachedTests(PfModeCached):
         self.main_app_manager.data_file_controls.setEnabled(True)
 
 
-class PfModeSaveCalibrationData(PfMode):
+class PfModeSaveCalibrationData(PfRecordedDataMode):
+    """
+    This class handles the Save Calibration Data Mode of the application. The Save Calibration Data Mode is used to save the calibration data to a file.
+    """
     
     signal_save_data = pyqtSignal(dict)
     
     def __init__(self, main_app_manager):
+        """
+        Initialize the mode, extends the parent class method to set the mode name
+        """
+
         super().__init__(main_app_manager)
         self.mode_name = "PF - Save Calibration Data"
 
     def setup_gui(self):
+        """
+        Extends the method in the parent class to set up the GUI for the save calibration data mode
+        """
         
         super().setup_gui()
         
@@ -386,9 +505,16 @@ class PfModeSaveCalibrationData(PfMode):
         self.main_app_manager.cached_data_creator.hide()
         
     def enable_disable_widgets_unique(self, enable):
+        """
+        Enables or disables the widgets that are unique to this mode when the PF thread is running, overrides the method in the parent class.
+        """
+
         self.main_app_manager.save_calibration_data_controls.set_running(not enable)
         
     def connect_gui(self):
+        """
+        Extends the method in the parent class to connect the GUI signals to the slots for the save calibration data mode
+        """
         # self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_button_clicked)
         # self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_button_clicked)
         # self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.continue_button_clicked)
@@ -396,6 +522,9 @@ class PfModeSaveCalibrationData(PfMode):
         super().connect_gui()
     
     def disconnect_gui(self):
+        """
+        Extends the method in the parent class to disconnect the GUI signals from the slots for the save calibration data mode
+        """
     #     self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_button_clicked)
     #     self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_button_clicked)
     #     self.main_app_manager.control_buttons.single_step_button.clicked.disconnect(self.continue_button_clicked)

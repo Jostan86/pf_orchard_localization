@@ -3,12 +3,22 @@ import json
 import numpy as np
 
 def get_map_data(map_data_path, move_origin=True, origin_offset=5):
+    """
+    Load the map data from the json file and package it into a dictionary
+
+    Args:
+        map_data_path (str): The path to the map data json file
+        move_origin (bool, optional): If True, move the origin to the min x and y values. Defaults to True.
+        origin_offset (int, optional): The offset to apply to the origin. Defaults to 5.
+
+    Returns:
+        dict: A dictionary containing the map data
+    """
 
     # Load the tree data dictionary
     with open(map_data_path, 'rb') as f:
         map_data = json.load(f)
 
-    # Extract the classes and positions from the tree data dictionary
     all_class_estimates = []
     all_position_estimates = []
     all_width_estimates = []
@@ -16,9 +26,10 @@ def get_map_data(map_data_path, move_origin=True, origin_offset=5):
     test_tree_numbers = []
     test_tree_indexes = []
 
+    # Extract the classes and positions from the tree data dictionary
     for object_data in map_data:
 
-        # Save test trees as a different class if separate_test_trees is True
+        # Save test trees as a different class 
         if object_data['test_tree']:
             test_tree_numbers.append(int(object_data['test_tree_number']))
             test_tree_indexes.append(1)
@@ -35,7 +46,6 @@ def get_map_data(map_data_path, move_origin=True, origin_offset=5):
         all_width_estimates.append(object_data['width_estimate'])
         object_numbers.append(object_data['object_number'])
 
-    # Make the classes and positions numpy arrays
     object_numbers = np.array(object_numbers, dtype=int)
     all_class_estimates = np.array(all_class_estimates, dtype=int)
     all_position_estimates = np.array(all_position_estimates)

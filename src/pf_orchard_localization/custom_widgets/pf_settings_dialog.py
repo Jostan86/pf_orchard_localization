@@ -3,12 +3,29 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDialogButt
 from ..utils.parameters import ParametersPf
 
 class PfSettingsDialog(QDialog):
-    # This class is for a dialog box that allows the user to change settings for the particle filter
+    """
+    A dialog box that allows the user to change settings for the particle filter
+    """
+
     def __init__(self, current_settings=None, parent=None, ):
+        """
+        Extends QDialog to create a dialog box for changing particle filter settings
+        
+        Args:
+            current_settings (ParametersPf): The current settings for the particle filter
+            parent (QWidget): The parent widget for the dialog box
+        """
         super(PfSettingsDialog, self).__init__(parent)
         self.init_ui(current_settings)
 
     def init_ui(self, current_settings: ParametersPf):
+        """
+        Initializes the UI for the dialog box
+
+        Args:
+            current_settings (ParametersPf): The current settings for the particle filter
+        """
+
         layout = QVBoxLayout()
         self.current_settings = current_settings
 
@@ -67,6 +84,13 @@ class PfSettingsDialog(QDialog):
 
 
     def get_settings(self):
+        """
+        Returns the settings entered by the user if they are valid
+
+        Returns:
+            ParametersPf: The settings entered by the user
+        """
+
         try:
             self.current_settings.r_dist = float(self.linear_noise_edit.text())
             self.current_settings.r_angle = float(self.angular_noise_edit.text())
@@ -80,3 +104,4 @@ class PfSettingsDialog(QDialog):
             return self.current_settings
         except ValueError:
             return None
+            

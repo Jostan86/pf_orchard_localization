@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 from scipy.ndimage import median_filter
 from std_srvs.srv import Trigger
+import os
 
 class RealSenseProcessor(Node):
 
@@ -20,8 +21,10 @@ class RealSenseProcessor(Node):
         self.depth_queue = deque()
         self.rgb_queue = deque()
         
-        self.depth_sub = message_filters.Subscriber(self, Image, '/registered/depth/image')
-        self.rgb_sub = message_filters.Subscriber(self, Image, '/registered/rgb/image')
+        depth_topic = os.environ.get('DEPTH_IMAGE_TOPIC')
+        rgb_topic = os.environ.get('RGB_IMAGE_TOPIC')
+        self.depth_sub = message_filters.Subscriber(self, Image, depth_topic)
+        self.rgb_sub = message_filters.Subscriber(self, Image, rgb_topic)
         
         self.ts = message_filters.ApproximateTimeSynchronizer(
             [self.depth_sub, self.rgb_sub], 
@@ -48,7 +51,6 @@ class RealSenseProcessor(Node):
     def callback(self, depth_msg, rgb_msg):
         self.depth_queue.append(depth_msg)
         self.rgb_queue.append(rgb_msg)
-        self.get_logger().info('Images received and added to queue')
 
 
     def process_images(self):

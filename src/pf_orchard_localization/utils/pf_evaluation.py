@@ -1,15 +1,15 @@
 from ..recorded_data_loaders import CachedDataLoader
-from ..pf_engine import PFEngine
-from map_data_tools import MapData
+from ..pf_engine import PfEngine
 from .parameters import ParametersPf
 import numpy as np
 import csv
 import os
 import time
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
-import copy
 
 class PfTest:
+    """
+    Class to store and process information for a single test
+    """
     def __init__(self, test_name, start_x, start_y, start_width, start_length, start_rotation, orientation_center,
                  orientation_range, data_file_name, start_time):
         self.test_name = test_name
@@ -30,39 +30,70 @@ class PfTest:
         self.test_completed = False
 
     def __repr__(self):
+        """
+        Returns a string representation of the test data
+        """
         return f"Test Name: {self.test_name}, Start X: {self.start_x}, Start Y: {self.start_y}, Start Width: {self.start_width}, Start Length: {self.start_length}, Start Rotation: {self.start_rotation}, Orientation Center: {self.orientation_center}, Orientation Range: {self.orientation_range}, Data File Name: {self.data_file_name}, Start Time: {self.start_time}"
 
     def reset_results(self):
+        """
+        Reset the results for the test
+        """
         self.test_completed = False
         self.results_distances = []
         self.results_convergence_accuracy = []
         self.results_run_times = []
 
     def add_results(self, run_time, correct_convergence, distance_to_converge):
+        """
+        Add the results of a trial to the test info
+
+        Args:
+            run_time: The time it took for the trial to run
+            correct_convergence: Whether the trial converged to the correct location
+            distance_to_converge: The distance traveled before converging
+        """
         self.results_distances.append(distance_to_converge)
         self.results_convergence_accuracy.append(correct_convergence)
         self.results_run_times.append(run_time)
 
     def get_results(self):
+        """
+        Calculate the results for the test
+
+        Returns:
+            convergence_rate (float): The average convergence rate for the test
+            avg_time_all (float): The average time to convergence for all trials
+            avg_time_converged (float): The average time to convergence for trials that converged
+        """
         convergences = np.array(self.results_convergence_accuracy)
         run_times = np.array(self.results_run_times)
 
-        # Calculate the convergence rate
         convergence_rate = np.sum(convergences) / len(convergences)
 
-        # Calculate the average time to convergence
         avg_time_all = np.sum(run_times) / len(run_times)
 
-        # Calculate the average time for trials that converged
         avg_time_converged = np.sum(run_times * convergences) / np.sum(convergences)
 
         return convergence_rate, avg_time_all, avg_time_converged
 
     def set_completed(self):
+        """
+        Set the test as completed
+        """
         self.test_completed = True
         
 class PfTestRegimen:
+    """
+    Class to store and process information for a set of tests
+    """
+
     def __init__(self, test_info_file_path, print_message_func=print):
+        """        
+        Args:
+            test_info_file_path (str): The path to the csv file containing the test information
+            print_message_func (function): The function to use for printing messages
+        """
 
         self.print_message_func = print_message_func
         
@@ -91,8 +122,15 @@ class PfTestRegimen:
 
         self.num_trials_per_location = 1
 
-    def process_results(self, save_path=None, overwrite=True, print_results=True):
+    def process_results(self, save_path=None, overwrite=True, print_results=True):      
+        """
+        Process the results of the tests
         
+        Args:
+            save_path (str): The path to save the results to
+            overwrite (bool): Whether to overwrite the file if it already exists
+            print_results (bool): Whether to print the results to the console
+        """  
         
         completed_tests = []
         for pf_test in self.pf_tests:
@@ -146,15 +184,26 @@ class PfTestRegimen:
             self.print_message_func("Overall Average Convergence Rate: {}".format(overall_avg_convergence_rate))
 
     def reset_tests(self):
+        """
+        Reset the results for all tests
+        """
         for pf_test in self.pf_tests:
             pf_test.reset_results()
 
     def reset_test(self, test_num):
+        """
+        Reset the results for a single test
+        """
         self.pf_tests[test_num].reset_results()        
 
 class PfTestExecutor:
+    """
+    Class to execute a set of tests using a particle filter, at this point this is a simplified headless version of what the app does.
+    """
+    #TODO: explore somehow having a single set of code for running the particle filter, instead of here and in the app. This seems 
+    # difficult, so another option may just be to setup a way to ensure changes to one are reflected in the other.
     def __init__(self,
-                 pf_engine: PFEngine,
+                 pf_engine: PfEngine,
                  parameters_pf: ParametersPf,
                  test_info_path: str,
                  cached_data_files_dir: str,
@@ -163,6 +212,18 @@ class PfTestExecutor:
                  save_path=None,
                  convergence_threshold=0.5,
                  print_message_func=print):
+        """
+        Args:
+            pf_engine (PfEngine): The particle filter engine
+            parameters_pf (ParametersPf): The parameters for the particle filter
+            test_info_path (str): The path to the csv file containing the test information
+            cached_data_files_dir (str): The directory containing the cached data files
+            num_trials (int): The number of trials to run for each test
+            class_mapping (tuple, optional): The mapping of classes from the trunk width estimation package to this one. Defaults to (1, 2, 0).
+            save_path (str, optional): The path to save the results to. Defaults to None.
+            convergence_threshold (float, optional): The distance at which the particle filter is considered to have converged. Defaults to 0.5.
+            print_message_func (function, optional): The function to use for printing messages. Defaults to print.
+        """
 
         self.convergence_threshold = convergence_threshold
         self.print_message_func = print_message_func
@@ -181,8 +242,10 @@ class PfTestExecutor:
         
         self.position_estimate = None
         self.position_gt = None
-       
-           
+    
+    ### ---------
+    # A bunch of functions that can be overridden to display the test status in a UI or other way
+    ### --------- 
     def signal_update_test_number(self, test_name):
         pass
     
@@ -199,34 +262,31 @@ class PfTestExecutor:
         pass
     
     def signal_plot_particles(self):
-        # particles = self.pf_engine.downsample_particles()
         pass
     
     def signal_update_image_number(self):
-        # current_image_position = self.data_manager.current_img_position
-        # num_img_msgs = self.data_manager.num_img_msgs
         pass
     
     def signal_update_trial_info(self):
-        # particle_count = self.main_app_manager.pf_engine.particles.shape[0]
-        
-        # self.main_app_manager.pf_test_controls.update_trial_info(current_time, particle_count)
         pass
     
     def signal_update_ui_with_trial_results(self, test_info):
-        # trial_convergence_rate, trial_avg_time_all, trial_avg_time_converged = test_info.get_results()
-        # self.main_app_manager.pf_test_controls.update_convergence_rate(trial_convergence_rate, 0)
-        # self.main_app_manager.pf_test_controls.update_test_time(trial_avg_time_all, 0)
         pass
     
     def process_results(self, save_path):
         self.test_regimen.process_results(save_path=save_path)
     
     def stop_pf(self):
+        """
+        Stop the particle filter gracefully
+        """
         self.pf_active = False
         self.tests_aborted = True
         
     def run_all_tests(self):
+        """
+        Run all tests in the test regimen
+        """
         self.tests_aborted = False
 
         self.print_message_func("Running all tests")
@@ -244,6 +304,12 @@ class PfTestExecutor:
             self.process_results(self.save_path)
 
     def run_selected_test(self, test_index):
+        """
+        Run a single test from the test regimen
+        
+        Args:
+            test_index (int): The index of the test to run
+        """
         self.tests_aborted = False
         
         test_info = self.test_regimen.pf_tests[test_index]
@@ -252,6 +318,12 @@ class PfTestExecutor:
 
             
     def run_test(self, test_info):
+        """
+        Run a single test
+        
+        Args:
+            test_info (PfTest): The test info for the test to run
+        """
         
         self.signal_update_test_number(test_info.test_name)
 
@@ -273,6 +345,12 @@ class PfTestExecutor:
             self.signal_update_ui_with_trial_results(test_info)
             
     def reset_for_test(self, test_info):
+        """
+        Reset the particle filter for a new test
+
+        Args:
+            test_info (PfTest): The test info for the test to reset for
+        """
         
         data_file_path = os.path.join(self.cached_data_files_dir, test_info.data_file_name + ".json")
         self.data_manager = CachedDataLoader(data_file_path)
@@ -288,6 +366,12 @@ class PfTestExecutor:
         self.reset_for_trial(test_info)
 
     def reset_for_trial(self, test_info):
+        """
+        Reset the particle filter for a new trial of the test
+
+        Args:
+            test_info (PfTest): The test info for the test to reset for
+        """
         
         message, current_msg = self.data_manager.set_time_stamp(test_info.start_time)
         self.signal_current_msg(current_msg)
@@ -295,14 +379,18 @@ class PfTestExecutor:
         self.reset_pf()
     
     def reset_pf(self):
-        
+        """
+        Reset the particle filter
+        """
         self.pf_engine.reset_pf(self.parameters_pf)
-        
-        # self.main_app_manager.data_file_time_line.set_time_line(test_info.start_time)
-        # self.main_app_manager.data_file_time_line_edited()
-        # self.main_app_manager.reset_pf(use_ui_parameters=False)
 
     def run_trial(self, test_info):
+        """
+        Run a single trial of the test
+
+        Args:
+            test_info (PfTest): The test info for the test to run
+        """
 
         self.reset_for_trial(test_info)
 
@@ -324,6 +412,9 @@ class PfTestExecutor:
         test_info.add_results(trial_time, correct_convergence, distance)
 
     def send_next_msg(self):
+        """
+        Send the next message to the particle filter
+        """
         current_msg = self.data_manager.get_next_msg()
 
         if current_msg is None:
@@ -348,6 +439,17 @@ class PfTestExecutor:
         self.signal_update_trial_info()
         
     def get_odom_data(self, current_msg):
+        """
+        Get the odometry data from the current message
+        
+        Args:
+            current_msg (dict): The current message
+            
+        Returns:
+            x_odom (float): The x odometry value
+            theta_odom (float): The theta odometry value
+            time_stamp_odom (float): The odometry time stamp
+        """
         odom_data = current_msg['data']
         x_odom = odom_data['x_odom']
         theta_odom = odom_data['theta_odom']
@@ -356,7 +458,12 @@ class PfTestExecutor:
         return x_odom, theta_odom, time_stamp_odom 
 
     def get_data_from_image_msg(self, current_msg):
+        """
+        Get the data from the image message
 
+        Args:
+            current_msg (dict): The current message
+        """
         positions, widths, class_estimates = self.get_trunk_data(current_msg)
 
         if positions is None:
@@ -373,7 +480,17 @@ class PfTestExecutor:
         self.signal_update_image_number()
         
     def get_trunk_data(self, current_msg):
+        """
+        Get the trunk data for the current message
 
+        Args:
+            current_msg (dict): The current message
+
+        Returns:
+            positions (np.array): The trunk positions
+            widths (np.array): The trunk widths
+            class_estimates (np.array): The class estimates for the trunks
+        """
         if current_msg['data'] is None:
             return None, None, None
 
@@ -387,6 +504,15 @@ class PfTestExecutor:
         return self.positions, self.widths, self.class_estimates
     
     def remap_classes(self, class_estimates):
+        """
+        Remap the classes from the trunk width estimation package to this one
+
+        Args:
+            class_estimates (np.array): The class estimates
+
+        Returns:
+            np.array: The remapped class estimates
+        """
         class_estimates_copy = class_estimates.copy()
         for i, class_num in enumerate(self.class_mapping):
             class_estimates_copy[class_estimates == i] = class_num
@@ -394,6 +520,13 @@ class PfTestExecutor:
         return class_estimates_copy
     
     def check_converged_location(self):
+        """
+        Check if the particle filter has converged to the correct location
+
+        Returns:
+            correct_convergence (bool): Whether the particle filter converged to the correct location
+            distance (float): The distance the particle filter traveled before converging
+        """
         position_estimate = self.pf_engine.best_particle[0:2]
 
         actual_position = self.position_gt[0:2]
@@ -405,123 +538,7 @@ class PfTestExecutor:
             return False, distance
         
     
-class PfTestExecutorQt(PfTestExecutor, QThread):
-    
-    update_test_number = pyqtSignal(int)
-    set_time_line = pyqtSignal(float)
-    update_trial_number = pyqtSignal(int)
-    plot_gt_position = pyqtSignal(np.ndarray)
-    plot_particles = pyqtSignal(np.ndarray)
-    update_image_number = pyqtSignal(int, int)
-    update_trial_info = pyqtSignal(float, int)
-    update_ui_with_trial_results = pyqtSignal(float, float, float)
-    reset_pf_app = pyqtSignal(bool)
-    print_message = pyqtSignal(str)
-    
-    
-    def __init__(self,
-                 pf_engine: PFEngine,
-                 parameters_pf: ParametersPf,
-                 test_info_path: str,
-                 cached_data_files_dir: str,
-                 num_trials,
-                 get_trunk_data_func,
-                 save_path=None,
-                 convergence_threshold=0.5,
-                 test_index=None,
-                 load_data_only=False
-                 ):
-        
-        PfTestExecutor.__init__(self,
-                                pf_engine=pf_engine, 
-                                parameters_pf=parameters_pf,
-                                test_info_path=test_info_path,
-                                cached_data_files_dir=cached_data_files_dir,
-                                num_trials=num_trials,
-                                save_path=save_path,
-                                print_message_func=self.signal_print_message, 
-                                convergence_threshold=convergence_threshold)
-        
-        self.get_trunk_data_func = get_trunk_data_func
-        self.test_index = test_index
-        self.load_data_only = load_data_only
-        
-        QThread.__init__(self)
-    
-    def signal_print_message(self, message):
-        self.print_message.emit(message)
-    
-    def run(self):
-        if self.test_index is not None:
-            if self.load_data_only:
-                self.reset_for_test(self.test_regimen.pf_tests[self.test_index])
-            else:
-                self.run_selected_test(self.test_index)
-        elif self.test_index is None:
-            self.run_all_tests()
-            
-    # def signal_running_all_tests(self):
-    #     self.running_all_tests.emit()
-    
-    # def signal_done_running_all_tests(self):
-    #     self.done_running_all_tests.emit()
-    
-    # def signal_running_selected_test(self):
-    #     self.running_selected_test.emit()
-    
-    # def signal_done_running_selected_test(self):
-    #     self.done_running_selected_test.emit()
-    
-    def signal_update_test_number(self, test_name):
-        self.update_test_number.emit(test_name)
-    
-    def signal_set_time_line(self, current_time):
-        self.set_time_line.emit(current_time)
-    
-    def signal_current_msg(self, current_msg):
-        self.get_trunk_data(current_msg)
-    
-    def signal_update_trial_number(self, trial_num):
-        self.update_trial_number.emit(trial_num)
-        
-    def signal_plot_gt_position(self):
-        self.plot_gt_position.emit(self.position_gt)
-    
-    def signal_plot_particles(self):
-        particles = self.pf_engine.downsample_particles()
-        self.plot_particles.emit(particles)
-        
-    def signal_update_image_number(self):
-        current_image_position = self.data_manager.current_img_position
-        num_img_msgs = self.data_manager.num_img_msgs
-        self.update_image_number.emit(current_image_position, num_img_msgs)
-    
-    def signal_update_trial_info(self):
-        particle_count = self.pf_engine.particles.shape[0]
-        current_time = time.time() - self.trial_start_time
-        self.update_trial_info.emit(current_time, particle_count)
-    
-    def signal_update_ui_with_trial_results(self, test_info):
-        trial_convergence_rate, trial_avg_time_all, trial_avg_time_converged = test_info.get_results()
-        # self.main_app_manager.pf_test_controls.update_convergence_rate(trial_convergence_rate, 0)
-        # self.main_app_manager.pf_test_controls.update_test_time(trial_avg_time_all, 0)
-        self.update_ui_with_trial_results.emit(trial_convergence_rate, trial_avg_time_all, trial_avg_time_converged)
 
-    def get_trunk_data(self, current_msg):
-        return self.get_trunk_data_func(current_msg)
-    
-    def reset_pf(self):
-        self.reset_pf_app.emit(False)
-        
-        # wait for the reset to complete
-        time.sleep(0.4)
-        
-        # self.pf_engine.reset_pf(self.parameters_pf)
-    
-    @pyqtSlot()
-    def stop_pf(self):
-        self.pf_active = False
-        self.tests_aborted = True
     
 
 

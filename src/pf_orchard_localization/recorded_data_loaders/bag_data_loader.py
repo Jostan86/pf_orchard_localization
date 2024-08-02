@@ -8,7 +8,20 @@ from rosbags.highlevel import AnyReader
 from rosbags.typesys import Stores, get_typestore
 
 class BagDataLoader(BaseDataLoader):
+    """
+    Data loader for ros1 bag files. The data loader reads the data from the rosbag file and provides the data to the rest
+    of the system. The data loader should be able to provide the data in the order it was recorded, and be able to skip to a
+    specific time stamp in the data.
+    """
+    
     def __init__(self, file_path, depth_topic, rgb_topic, odom_topic):
+        """
+        Args:
+            file_path (str): The path to the rosbag file
+            depth_topic (str): The topic name for the depth image messages
+            rgb_topic (str): The topic name for the rgb image messages
+            odom_topic (str): The topic name for the odometry messages
+        """
 
         super().__init__()
        
@@ -25,19 +38,43 @@ class BagDataLoader(BaseDataLoader):
         self.open_file(file_path)
     
     def rosbag_import(self):
+        """
+        Import the rosbag module, separate from the rest of the code to allow for running the code without the rosbag module
+        """
         import rosbag
         self.rosbag = rosbag
 
     @staticmethod
     def bag_timestamp_to_sec(time):
+        """
+        Convert the rosbag timestamp to seconds
+
+        Args:
+            time (rospy.Time): The timestamp to convert
+        """
         return time.to_sec()
 
     @staticmethod
     def header_timestamp_to_sec(time):
+        """
+        Convert the header timestamp to seconds
+
+        Args:
+            time (std_msgs.header.stamp): The timestamp to convert
+        """
         return time.to_sec()
 
-
     def pair_messages(self, d_msg, img_msg):
+        """
+        Pair the depth and image messages together if they have the same timestamp
+
+        Args:
+            d_msg (sensor_msgs.msg.Image): The depth image message
+            img_msg (sensor_msgs.msg.Image): The image message
+
+        Returns:
+            tuple: The depth image, color image, and timestamp
+        """
 
         if d_msg is not None and img_msg is not None and d_msg.header.stamp == img_msg.header.stamp:
             try:
@@ -52,6 +89,12 @@ class BagDataLoader(BaseDataLoader):
         return None, None, None
 
     def open_file(self, file_path):
+        """
+        Open the rosbag file and load the data
+
+        Args:
+            file_path (str): The path to the rosbag file
+        """
 
         self.current_data_file_path = file_path
 
@@ -66,53 +109,94 @@ class BagDataLoader(BaseDataLoader):
 
 
     def handle_message(self, topic, msg, t):
-            if self.t_start is None:
-                self.t_start = self.bag_timestamp_to_sec(t)
-            if topic == self.depth_topic:
-                self.depth_msg = msg
-                depth_img, color_img, time_stamp_img = self.pair_messages(self.depth_msg, self.color_msg)
-                if depth_img is not None:
-                    self.time_stamps.append(self.bag_timestamp_to_sec(t) - self.t_start)
-                    msg = {'topic': 'image', 'rgb_image': color_img, 'depth_image': depth_img,
-                           'timestamp': time_stamp_img}
-                    self.msg_list.append(msg)
-                    self.msg_order.append(1)
+        """
+        Handle the message based on the topic
 
-            elif topic == self.rgb_topic:
-                self.color_msg = msg
-                depth_img, color_img, time_stamp_img = self.pair_messages(self.depth_msg, self.color_msg)
-                if depth_img is not None:
-                    self.time_stamps.append(self.bag_timestamp_to_sec(t) - self.t_start)
-                    msg = {'topic': 'image', 'rgb_image': color_img, 'depth_image': depth_img,
-                           'timestamp': time_stamp_img}
-                    self.msg_list.append(msg)
-                    self.msg_order.append(1)
-
-            elif topic == self.odom_topic:
+        Args:
+            topic (str): The topic of the message
+            msg (object): The message data
+            t (rospy.Time): The timestamp of the message
+        """
+        if self.t_start is None:
+            self.t_start = self.bag_timestamp_to_sec(t)
+        if topic == self.depth_topic:
+            self.depth_msg = msg
+            depth_img, color_img, time_stamp_img = self.pair_messages(self.depth_msg, self.color_msg)
+            if depth_img is not None:
                 self.time_stamps.append(self.bag_timestamp_to_sec(t) - self.t_start)
-                msg = {'topic': 'odom', 'data': msg}
+                msg = {'topic': 'image', 'rgb_image': color_img, 'depth_image': depth_img,
+                        'timestamp': time_stamp_img}
                 self.msg_list.append(msg)
-                self.msg_order.append(0)
+                self.msg_order.append(1)
+
+        elif topic == self.rgb_topic:
+            self.color_msg = msg
+            depth_img, color_img, time_stamp_img = self.pair_messages(self.depth_msg, self.color_msg)
+            if depth_img is not None:
+                self.time_stamps.append(self.bag_timestamp_to_sec(t) - self.t_start)
+                msg = {'topic': 'image', 'rgb_image': color_img, 'depth_image': depth_img,
+                        'timestamp': time_stamp_img}
+                self.msg_list.append(msg)
+                self.msg_order.append(1)
+
+        elif topic == self.odom_topic:
+            self.time_stamps.append(self.bag_timestamp_to_sec(t) - self.t_start)
+            msg = {'topic': 'odom', 'data': msg}
+            self.msg_list.append(msg)
+            self.msg_order.append(0)
+
 
 class Bag2DataLoader(BagDataLoader):
+    """
+    Data loader for ros2 bag files. The data loader reads the data from the rosbag file and provides the data to the rest
+    of the system. The data loader should be able to provide the data in the order it was recorded, and be able to skip to a
+    specific time stamp in the data.
+    """
+
     def __init__(self, file_path, depth_topic, rgb_topic, odom_topic):
+        """
+        Extend the contructor of the BagDataLoader class to handle ros2 bag files
+
+        Args:
+            file_path (str): The path to the rosbag file
+            depth_topic (str): The topic name for the depth image messages
+            rgb_topic (str): The topic name for the rgb image messages
+            odom_topic (str): The topic name for the odometry messages
+        """
         self.typestore = get_typestore(Stores.ROS2_HUMBLE)
 
         super().__init__(file_path, depth_topic, rgb_topic, odom_topic)
         
     def rosbag_import(self):
-        ...
+        pass
         
     @staticmethod
     def bag_timestamp_to_sec(time):
+        """
+        Convert the rosbag timestamp to seconds
+        
+        Args:
+            time: The timestamp to convert
+        """
         return time * 1e-9  # convert from nanoseconds to seconds
 
     @staticmethod
     def header_timestamp_to_sec(time):
+        """
+        Convert the header timestamp to seconds
+
+        Args:
+            time: The timestamp to convert
+        """
         return time.sec + time.nanosec * 1e-9
 
     def open_file(self, file_path):
+        """
+        Override the open_file method to handle ros2 bag files
 
+        Args:
+            file_path: The path to the rosbag file
+        """
         self.current_data_file_path = file_path
         bagpath = Path(file_path)
 

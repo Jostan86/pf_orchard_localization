@@ -9,15 +9,12 @@ import numpy as np
 from map_data_tools import MapData
 
 class ClickablePlotWidget(pg.PlotWidget):
-    # This class is for a plot widget that emits a signal when clicked about where it was clicked. It also distinguishes
-    # between a normal click and a shift-click
-
-    # Define a custom signal
+    """
+    This is plot widget that emits a signal when clicked about where it was clicked. It also distinguishes
+    between a normal click and a shift-click
+    """
+    
     clicked = pyqtSignal(float, float, bool)  # Signal to emit x and y coordinates
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.is_repainting = False
 
     # def mousePressEvent(self, event: QMouseEvent): # Qt6
     #     # Convert QPoint to QPointF
@@ -32,7 +29,11 @@ class ClickablePlotWidget(pg.PlotWidget):
     #         self.clicked.emit(x, y, False)
 
     #     super().mousePressEvent(event)
+
     def mousePressEvent(self, event):
+        """
+        Extends the mousePressEvent method to emit a signal when the plot is clicked with the x and y coordinates
+        """
         mouse_point = self.plotItem.vb.mapSceneToView(event.pos())
         x = mouse_point.x()
         y = mouse_point.y()
@@ -45,20 +46,24 @@ class ClickablePlotWidget(pg.PlotWidget):
 
         super().mousePressEvent(event)
 
-    def paintEvent(self, event):
-        self.is_repainting = True
-        super().paintEvent(event)
-        self.is_repainting = False
+class PfPlotter(QWidget):
+    """
+    Class to handle all the plotting for the particle filter app
+    """
 
-class PFPlotter(QWidget):
-    # Class to handle all the plotting for the particle filter app
     def __init__(self, map_data: MapData):
+        """
+        Constructor for the PFPlotter class
+        
+        Args:
+            map_data (MapData): An instance of the MapData class that contains all the data for the map
+        """
+        
         super().__init__()
 
-        # Indicates whether or not to show tree numbers on the plot
+        # State of whether or not to show tree numbers on the plot
         self.show_nums = False
 
-        # Create a pyqtgraph plot widget with some added functionality
         self.plot_widget = ClickablePlotWidget()
 
         self.plot_nums_toggle_button = QPushButton("Toggle Numbers")
@@ -89,15 +94,23 @@ class PFPlotter(QWidget):
 
         self.particles_save = None
 
+    @pyqtSlot()
     def toggle_show_nums(self):
-        # Check if the thread is running
-        
-        
+        """
+        Slot to toggle whether or not to show tree numbers on the plot when the button is clicked
+        """        
         self.show_nums = not self.show_nums
         self.draw_plot(particles=self.particles_save)
 
     def draw_plot(self, particles=None):
-        """Method to draw the map on the plot widget"""
+        """
+        Method to draw the map on the plot widget, called when the plot is first created and when the toggle numbers button is clicked. 
+        Otherwise the update functions are used to update the data in the plot.
+        
+        Args:
+            particles (np.ndarray): An array of particles to plot on the map
+        """
+        self.plot_widget.clear()
 
         # Hard-coded row number positions
         row_num_xs = [4.9, 5.5, 6.05, 6.65, 7.4, 7.45, 7.9, 8.65, 9.2, 9.65, 10.25, 10.65, 11.05, 11.6, 12.1, 12.65,
@@ -108,7 +121,7 @@ class PFPlotter(QWidget):
         row_num_ys = [y - 1 for y in row_num_ys]
         row_nums = [96+i for i in range(len(row_num_xs))]
         
-        # Add numbers to the trees if show_nums is True, which is toggled by a button in the app
+        # Start a thread to add tree numbers to the plot if show_nums is True. Put in a thread because if it's a lot of numbers it'll freeze the GUI
         if self.show_nums:
             self.add_nums_thread = TextItemWorker(self.all_position_estimates, self.all_object_numbers, self.all_class_estimates, self.test_tree_numbers, row_num_xs, row_num_ys, row_nums)
             self.add_nums_thread.text_item_ready.connect(self.add_text_item)
@@ -117,18 +130,18 @@ class PFPlotter(QWidget):
             if self.add_nums_thread is not None and self.add_nums_thread.is_running:
                 self.add_nums_thread.stop()
 
-        # Clear the plot widget
-        self.plot_widget.clear()
-
         # Get the positions of the trees, posts, and test trees
+        # TODO: Make these classes a setting somewhere
         tree_positions = self.all_position_estimates[self.all_class_estimates == 0]
         post_positions = self.all_position_estimates[self.all_class_estimates == 1]
         test_tree_positions = self.all_position_estimates[self.all_class_estimates == 2]
 
         # Set size of dots
+        # TODO: Make this a setting somewhere
         self.dot_size = 12
 
         # Add data to the plot widget
+        # TODO: Make these colors settings somewhere
         self.plot_widget.plot(tree_positions[:, 0], tree_positions[:, 1], pen=None, symbol='o', symbolBrush=(0, 158, 115),
                               symbolSize=self.dot_size, name='Trees')
         self.plot_widget.plot(post_positions[:, 0], post_positions[:, 1], pen=None, symbol='o', symbolBrush=(230, 159, 0),
@@ -136,20 +149,41 @@ class PFPlotter(QWidget):
         self.plot_widget.plot(test_tree_positions[:, 0], test_tree_positions[:, 1], pen=None, symbol='o',
                               symbolBrush=(6, 180, 233), symbolSize=self.dot_size, name='Test Trees')
 
-        
-
         self.particle_plot_item = self.plot_widget.plot([], [], pen=None, symbol='o',
                                                         symbolBrush=(0, 0, 0), symbolSize=2, name='Particles')
 
         self.actual_position_plot_item = self.plot_widget.plot([], [],
                                                                pen=None,
                                                                symbol='o',
-                                                               symbolBrush=(213, 94, 0),
+                                                               symbolBrush=(211, 0, 255),
                                                                symbolSize=0.75*self.dot_size,
                                                                name='Actual Position')
-        self.update_particles(particles)
         
+        self.position_estimate_plot_item = self.plot_widget.plot([], [],
+                                                                 pen=None,
+                                                                 symbol='o',
+                                                                 symbolBrush=(213, 94, 0),
+                                                                 symbolSize=self.dot_size,
+                                                                 name='Pose Estimate')
+        
+        self.gnss_estimate_plot_item = self.plot_widget.plot([], [],
+                                                                 pen=None,
+                                                                 symbol='o',
+                                                                 symbolBrush=(0, 0, 0),
+                                                                 symbolSize=self.dot_size * 2,
+                                                                 name='Pose Estimate')
+
+        
+        self.update_particles(particles)
+    
+    @pyqtSlot(dict)
     def add_text_item(self, item):
+        """
+        Slot to add a text item to the plot widget
+        
+        Args:
+            item (dict): A dictionary containing the html, x, y, and anchor values for the text item
+        """
         if self.show_nums:
             text_item = pg.TextItem(html=item['html'], anchor=item['anchor'])
             text_item.setPos(item['x'], item['y'])
@@ -157,99 +191,81 @@ class PFPlotter(QWidget):
     
     @pyqtSlot(np.ndarray)
     def update_particles(self, particles):
-        # Method to update the particles on the plot
+        """
+        Slot to update the particles on the plot
+
+        Args:
+            particles (np.ndarray): An array of particles to plot on the map
+        """
         if particles is not None:
-            # particles = self.downsample_particles(particles)
             self.particle_plot_item.setData(particles[:, 0], particles[:, 1])
         else:
             self.particle_plot_item.setData([], [])
 
         self.particles_save = particles
-
-    def downsample_particles(self, particles, max_samples=10000):
-        """
-        Downsample a 2D array of particles to a maximum number of samples. This is useful for plotting large numbers of
-        particles without slowing down the GUI.
-
-        Parameters:
-        - particles: 2D numpy array of shape (n, 2)
-        - max_samples: int, maximum number of samples after downsampling
-
-        Returns:
-        - Downsampled 2D numpy array of particles
-        """
-        num_particles = particles.shape[0]
-        if num_particles <= max_samples:
-            return particles
-
-        indices = np.random.choice(num_particles, max_samples, replace=False)
-        return particles[indices]
-    
+   
     @pyqtSlot(np.ndarray)
     def update_actual_position(self, actual_position):
+        """
+        Slot to update the dot representing the actual ground position on the plot (for when using cached data)
+
+        Args:
+            actual_position (np.ndarray): An array containing the x and y coordinates of the actual position estimate
+        """
         if actual_position is not None:
             self.actual_position_plot_item.setData([actual_position[0]], [actual_position[1]])
         else:
             self.actual_position_plot_item.setData([], [])
 
+    @pyqtSlot(dict)
+    def update_gnss_estimate(self, gnss_data):
+        """
+        Slot to update the dot representing the GNSS estimate of the position on the plot
 
-class TreatingPFPlotter(PFPlotter):
-    def __init__(self, map_data: MapData):
-        super().__init__(map_data)
-    def draw_plot(self, particles=None):
-        super().draw_plot(particles)
+        Args:
+            gnss_data (dict): A dictionary containing the easting and northing values of the GNSS estimate
+        """
+        if gnss_data is not None:
+            easting = gnss_data["easting"]
+            northing = gnss_data["northing"]
+            self.gnss_estimate_plot_item.setData([easting], [northing])
+        else:
+            self.gnss_estimate_plot_item.setData([], [])
 
-        self.position_estimate_plot_item = self.plot_widget.plot([], [],
-                                                                 pen=None,
-                                                                 symbol='o',
-                                                                 symbolBrush=(213, 94, 0),
-                                                                 symbolSize=self.dot_size,
-                                                                 name='Pose Estimate')
-
-        self.in_progress_tree_plot_item = self.plot_widget.plot([], [],
-                                                                pen=None,
-                                                                symbol='o',
-                                                                symbolBrush=(211, 0, 255),
-                                                                symbolSize=self.dot_size,
-                                                                name='In Progress Tree')
-
-        self.treated_trees_plot_item = self.plot_widget.plot([], [],
-                                                             pen=None,
-                                                             symbol='o',
-                                                             symbolBrush=(138, 187, 248),
-                                                             symbolSize=self.dot_size,
-                                                             name='Treated Trees')
-
-
-
-
+    @pyqtSlot(np.ndarray)
     def update_position_estimate(self, position_estimate):
-        pass
-        # if position_estimate is not None:
-        #     self.position_estimate_plot_item.setData([position_estimate[0]], [position_estimate[1]])
-        # else:
-        #     self.position_estimate_plot_item.setData([], [])
+        """
+        Slot to update the dot representing the best estimate of the position on the plot
 
-    def update_in_progress_tree(self, in_progress_tree_position):
-        if in_progress_tree_position is not None:
-            self.in_progress_tree_plot_item.setData([in_progress_tree_position[0]], [in_progress_tree_position[1]])
+        Args:
+            position_estimate (np.ndarray): An array containing the x and y coordinates of the position estimate
+        """
+        if position_estimate is not None:
+            self.position_estimate_plot_item.setData([position_estimate[0]], [position_estimate[1]])
         else:
-            self.in_progress_tree_plot_item.setData([], [])
+            self.position_estimate_plot_item.setData([], [])
 
-    def update_treated_trees(self, complete_position):
-        if complete_position is None:
-            self.treated_trees_plot_item.setData([], [])
-        elif len(complete_position) == 1:
-            complete_position = complete_position[0]
-            self.treated_trees_plot_item.setData([complete_position[0]], [complete_position[1]])
-        else:
-            self.treated_trees_plot_item.setData(complete_position[:, 0], complete_position[:, 1])
 
-            
 class TextItemWorker(QThread):
+    """
+    Worker thread to add tree and row number text items to the plot widget
+    """
+
     text_item_ready = pyqtSignal(dict)
 
     def __init__(self, all_position_estimates, all_object_numbers, all_class_estimates, test_tree_numbers, row_num_xs, row_num_ys, row_nums):
+        """
+        Constructor for the TextItemWorker class
+
+        Args:
+            all_position_estimates (np.ndarray): An array of all the tree positions
+            all_object_numbers (np.ndarray): An array of all the tree numbers
+            all_class_estimates (np.ndarray): An array of all the tree classifications
+            test_tree_numbers (np.ndarray): An array of the test tree numbers
+            row_num_xs (list): A list of the x positions for the row numbers
+            row_num_ys (list): A list of the y positions for the row numbers
+            row_nums (list): A list of the row numbers
+        """
         super().__init__()
         self.all_position_estimates = all_position_estimates
         self.all_object_numbers = all_object_numbers
@@ -270,14 +286,15 @@ class TextItemWorker(QThread):
             if not self.is_running:
                 break
             
-            tree_num_text = {
-                'html': '<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(self.all_object_numbers[i]),
-                'x': x,
-                'y': y,
-                'anchor': (1.1, 0.5)
-            }
-            # items.append(tree_num_text)
-            self.text_item_ready.emit(tree_num_text)
+            #TODO: Make these numbers a toggleable setting somewhere
+            # tree_num_text = {
+            #     'html': '<div style="text-align: center"><span style="color: #000000; font-size: 8pt;">{}</span></div>'.format(self.all_object_numbers[i]),
+            #     'x': x,
+            #     'y': y,
+            #     'anchor': (1.1, 0.5)
+            # }
+            # # items.append(tree_num_text)
+            # self.text_item_ready.emit(tree_num_text)
             
 
             if self.all_class_estimates[i] == 2:

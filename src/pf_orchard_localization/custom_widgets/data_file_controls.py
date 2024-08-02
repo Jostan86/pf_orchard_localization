@@ -5,6 +5,9 @@ import logging
 from ..recorded_data_loaders import Bag2DataLoader, CachedDataLoader
 
 class DataFileControls(QWidget):
+    """
+    This widget is used to control the data file selection and loading of data files
+    """
     
     data_file_controls_message = pyqtSignal(str)
     data_file_loaded = pyqtSignal(bool, object)
@@ -13,6 +16,13 @@ class DataFileControls(QWidget):
     reset_pf = pyqtSignal(bool)
 
     def __init__(self, data_parameters, using_cached_data=False):
+        """
+        Initialize the data file controls widget
+
+        Args:
+            data_parameters: Parameters for the data file controls
+            using_cached_data (bool): Whether to use cached data files
+        """
         super().__init__()
 
         self.data_manager = None
@@ -71,17 +81,38 @@ class DataFileControls(QWidget):
     
     @pyqtSlot(float)
     def set_time_line(self, time_stamp: float):
+        """
+        Slot to set the time line edit box to a given time stamp
+
+        Args:
+            time_stamp (float): The time stamp to set the time line to
+        """
         time_stamp = round(time_stamp, 2)
         self.data_file_time_line.setText(str(time_stamp))
-        
+    
+    @pyqtSlot()
     def trigger_open_data_file(self):
+        """
+        Slot to trigger the opening of a data file from the open button
+        """
         self.open_data_file(self.current_data_file_selection)
 
+    @pyqtSlot()
     def trigger_open_next_data_file(self):
+        """
+        Slot to trigger the opening of the next data file in the list from the open next button
+        """
         self.load_next_data_file(True)
 
     
     def get_next_data_file_name(self):
+        """
+        Get the name of the next data file in the list of data files
+
+        Returns:
+            str: The name of the next data file
+        """
+
         current_data_file_index = self.data_file_names.index(self.current_data_file_selection)
         next_data_file_index = current_data_file_index + 1
 
@@ -91,6 +122,9 @@ class DataFileControls(QWidget):
             return self.data_file_names[next_data_file_index]
 
     def set_data_file_names(self):
+        """
+        Set the data file names in the data file selector combo box
+        """
 
         self.data_file_names = os.listdir(self.data_file_dir)
 
@@ -109,15 +143,22 @@ class DataFileControls(QWidget):
 
     @property
     def current_data_file_selection(self):
+        """
+        Get the name of the currently selected data file
+        """
         return self.data_file_selector.currentText()
 
     def set_combo_box_to_current(self):
+        """
+        Set the data file selector combo box to the current data file in the data manager
+        """
         current_data_file_name = self.data_manager.current_data_file_name
         self.data_file_selector.setCurrentIndex(self.data_file_names.index(current_data_file_name))
     
     def data_file_time_line_edited(self):
-        """Change the time the data file is at based on a time entered in the time line edit box by the user"""
-
+        """
+        Change the time the data file is at based on a time entered in the time line edit box by the user
+        """
         time_stamp = self.data_file_time_line.text()
 
         # Check if the value entered is a number
@@ -144,7 +185,8 @@ class DataFileControls(QWidget):
         
     @pyqtSlot(bool)
     def load_next_data_file(self, load_first_image=True):
-        """Load the next data file in the list of data files.
+        """
+        Load the next data file in the list of data files.
 
         Args:
             load_first_image (bool): Whether to load the first image in the new data file
@@ -208,10 +250,14 @@ class DataFileControls(QWidget):
             
     
     def check_data_file_is_valid(self, data_file_path: str):
-        """Check if a data file is valid
+        """
+        Check if a data file is valid
 
         Args:
             data_file_name (str): Name of the data file to check
+
+        Returns:
+            bool: Whether the data file is valid
         """
         if not os.path.isfile(data_file_path) and not os.path.isdir(data_file_path):
             return False, "Invalid file name"
@@ -229,6 +275,14 @@ class DataFileControls(QWidget):
             return False, "Invalid file"
     
     def dispense_data_manager(self, success: bool, message: str = None):
+        """
+        Emit the data manager object and a message
+
+        Args:
+            success (bool): Whether the data manager was successfully loaded
+            message (str): A message to emit with the data manager
+        """
+
         if message is not None:
             self.data_file_controls_message.emit(message)
             
@@ -241,11 +295,20 @@ class DataFileControls(QWidget):
             self.data_file_loaded.emit(True, self.data_manager)
 
     def set_opening(self):
+        """
+        Set the data file controls to the opening state
+        """
         self.data_file_open_button.setText("---")
         self.data_file_open_next_button.setText("---")
         self.data_file_open_button.repaint()
 
     def set_opened(self, set_to_current=True):
+        """
+        Set the data file controls to the opened state
+        
+        Args:
+            set_to_current (bool): Whether to set the data file selector to the current data file
+        """
         self.data_file_open_button.setText("Open")
         self.data_file_open_next_button.setText("Open Next")
         if set_to_current:

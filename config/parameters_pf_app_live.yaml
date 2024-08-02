@@ -9,10 +9,10 @@ image_display_scale: 1.0
 # Jazz apple orchard
 # ----------------------
 
-map_data_path: /media/jostan/portabits/pf_app_data/map_data_jazz_new.json
+map_data_path: /home/vscode/app_data/map_data_jazz_new.json
 
-rgb_topic: /registered/rgb/image
-depth_topic: /registered/depth/image
+# rgb_topic: /throttled/registered/rgb/image
+# depth_topic: /throttled/registered/depth/image
 
-pf_config_file_path: /pf_orchard_localization/config/parameters_pf.yaml
+pf_config_file_path: /home/vscode/pf_orchard_localization/config/parameters_pf.yaml
 

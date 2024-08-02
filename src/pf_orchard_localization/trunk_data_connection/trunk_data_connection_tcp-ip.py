@@ -8,6 +8,11 @@ from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QApplication
 from .trunk_data_connection import TrunkDataConnection
 
 class TrunkDataConnectionJetson(TrunkDataConnection):
+    """
+    Class for connecting to the trunk data producer from the trunk_width_estimation package. This isn't currenltly used
+    in the system, but is left here in case it is needed in the future.
+    """
+
     def __init__(self,
                  width_estimation_config_file_path: str = None,
                  seg_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
@@ -16,7 +21,16 @@ class TrunkDataConnectionJetson(TrunkDataConnection):
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
                  message_printer: Callable[[List[str]], None] = None):
-
+        """
+        Args:
+            width_estimation_config_file_path (str, optional): The path to the width estimation config file. Defaults to None.
+            seg_image_display_func (Callable[[Optional[np.ndarray]], None], optional): The function to display the segmented image. Defaults to None.
+            pre_filtered_segmentation_display_func (Callable[[Optional[np.ndarray]], None], optional): The function to display the pre-filtered segmentation image. Defaults to None.
+            original_image_display_func (Callable[[Optional[np.ndarray]], None], optional): The function to display the original image. Defaults to None.
+            class_mapping (tuple, optional): The mapping of classes from the trunk width estimation package to this one. Defaults to (1, 2, 0).
+            offset (tuple, optional): The offset to apply to the positions. Defaults to (0, 0).
+            message_printer (Callable[[List[str]], None], optional): The function to print messages. Defaults to None.
+        """
         super().__init__(width_estimation_config_file_path=None,
                          seg_image_display_func=seg_image_display_func,
                          pre_filtered_segmentation_display_func=pre_filtered_segmentation_display_func,

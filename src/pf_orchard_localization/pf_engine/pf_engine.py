@@ -5,7 +5,9 @@ from scipy.spatial import KDTree
 from scipy.stats import norm
 from scipy.ndimage import label
 from map_data_tools import MapData
-class PFEngine:
+
+
+class PfEngine:
 
     def __init__(self, map_data: MapData, random_seed=None) -> None:
         
@@ -19,8 +21,9 @@ class PFEngine:
         self.kd_tree = KDTree(self.map_positions)
 
     def reset_pf(self, setup_data) -> None:
-        """Reset the particle filter with the given setup data."""
-
+        """
+        Reset the particle filter with the given setup data.
+        """
         self.start_pose_center = np.array([setup_data.start_pose_center_x, setup_data.start_pose_center_y])
         self.start_pose_width = setup_data.start_width
         self.start_pose_height = setup_data.start_height
@@ -137,8 +140,10 @@ class PFEngine:
 
         self.motion_update(u, dt_odom, num_readings)
 
-    def scan_update(self, tree_msg):
-        """Handle the tree message. This will be called every time a tree message is received."""
+    def scan_update(self, tree_msg: dict):
+        """
+        Handle the tree message. This will be called every time a tree message is received.
+        """
 
         if tree_msg['positions'] is not None:
 
@@ -196,7 +201,9 @@ class PFEngine:
 
 
     def resample_particles(self):
-        """Resample the particles according to the particle weights using the low variance sampling algorithm."""
+        """
+        Resample the particles according to the particle weights using the low variance sampling algorithm.
+        """
 
         # Get the number of particles to resample
         num_particles = self.calculate_num_particles(self.particles)
@@ -234,8 +241,7 @@ class PFEngine:
             particle_states (np.ndarray): An array of shape (n, 3) containing the states of the particles
             object_locations (np.ndarray): An array of shape (n, 2) containing the locations of the objects seen by the robot
 
-        Returns
-
+        Returns:
             np.ndarray: A MxNx2 numpy array, with x and y coordinates for each object relative to each particle. Here n
             is the number of particles and m is the number of trees.
         """
@@ -257,17 +263,12 @@ class PFEngine:
         """
         Calculates an array of the object's location in the local frame.
 
-        Parameters:
-        ----------
-        particle_states : np.ndarray
-            An array of shape (n, 3) containing the states of the particles
-        object_locs : np.ndarray
-            An array of shape (n, 2) containing the locations of the closest object to the object seen by each particle.
+        Args:
+            particle_states (np.ndarray): An array of shape (n, 3) containing the states of the particles
+            object_locs (np.ndarray): An array of shape (n, 2) containing the locations of the objects seen by the robot
 
-        Returns
-         ----------
-         np.ndarray
-            A Nx2 numpy array, with r and theta coordinates for each object relative to each particle.
+        Returns:
+            np.ndarray: A Nx2 numpy array, with r and theta coordinates for each object relative to each particle.
         """
         # Calculate differences in x and y coordinates
         dx = object_locs[:, 0] - particle_states[:, 0]
@@ -283,26 +284,21 @@ class PFEngine:
         polar_coords = np.vstack((ranges, bearings)).T
 
         return polar_coords
-
-    def get_particle_weight_localize(self, particle_states, sensed_tree_coords, widths_sensed, positions_sensed) -> np.ndarray:
+    
+    def get_particle_weight_localize(self, particle_states: np.ndarray, sensed_tree_coords: np.ndarray, widths_sensed: np.ndarray, positions_sensed: np.ndarray) -> np.ndarray:
         """
+        Calculate the weights of the particles based on the sensed tree locations and widths.
 
-        Parameters
-        ----------
-        particle_states : np.ndarray
-            An array of shape (n, 3) containing the states of the particles
-        sensed_tree_coords : np.ndarray
-            An array of shape (m, n, 2) containing the locations of the trees in the global frame for each particle. m is the
-            number of trees and n is the number of particles.
-        widths_sensed : np.ndarray
-            An array containing the widths of the trees.
-
-        Returns
-        -------
-        np.ndarray
-            An array of shape (n,) containing the weights of the particles.
+        Args:
+            particle_states (np.ndarray): An array of shape (n, 3) containing the states of the particles
+            sensed_tree_coords (np.ndarray): An array of shape (m, n, 2) containing the locations of the trees in the global frame for each particle. m is the
+                                             number of trees and n is the number of particles.
+            widths_sensed (np.ndarray): An array containing the widths of the trees.
+            positions_sensed (np.ndarray): An array of shape (m, 2) containing the locations of the trees in the robot frame.
+        
+        Returns:
+            np.ndarray: An array of shape (n,) containing the weights of the particles.
         """
-
         # Initialize scores
         scores = np.ones(particle_states.shape[0], dtype=float)
 
@@ -327,40 +323,49 @@ class PFEngine:
             #     print("range diff: ", range_diff[j], "bearing diff: ", bearing_diff[j])
 
             # Calculate the probability of the sensed tree being at the map tree location
-            prob_range = self.probability_of_values(range_diff, 0, self.range_sd)
-            prob_bearing = self.probability_of_values(bearing_diff, 0, self.bearing_sd)
+            prob_range = self.probability_of_values(range_diff, self.range_sd)
+            prob_bearing = self.probability_of_values(bearing_diff, self.bearing_sd)
 
             # Update the scores
             scores *= prob_range * prob_bearing
-
+            
             if self.include_width:
                 # Calculate the difference between the sensed tree width and the map tree width
                 width_diffs = np.abs(widths_sensed[i] - (self.map_widths[idx]))
 
                 # Update the scores based on the width difference
-                prob_width = self.probability_of_values(width_diffs, 0, self.width_sd)
+                prob_width = self.probability_of_values(width_diffs, self.width_sd)
                 scores *= prob_width
 
         return scores
 
-    def probability_of_values(self, arr, mean, std_dev):
-        """Find the probability of a value in an array given a mean and standard deviation."""
-
-        norm_pdf = (1 / (std_dev * np.sqrt(2 * np.pi))) * np.exp(-(arr - mean) ** 2 / (2 * std_dev ** 2))
-        return norm_pdf
-
-    def rotate_around_point(self, particles, angle_rad, center_point):
+    def probability_of_values(self, measurement_discrepancy: np.ndarray, std_dev: float) -> np.ndarray:
         """
-        Rotate numpy array points (in the first two columns)
-        around a given point by a given angle in degrees.
-
-        Parameters:
-        - matrix: numpy array where first two columns are x and y coordinates
-        - angle_degree: angle to rotate in degrees
-        - point: tuple of (x, y) coordinates of rotation center
+        Find the probability of each particle using a normal distribution given the discrepancy between the expected sensor value and the actual sensor value,
+        for each particle, as well as the expected standard deviation.
+        
+        Args:
+            measurement_discrepancy (np.ndarray): The array of values  
+            std_dev (float): The standard deviation
 
         Returns:
-        - Rotated numpy array
+            np.ndarray: The probability of each value in the array
+        """
+
+        norm_pdf = (1 / (std_dev * np.sqrt(2 * np.pi))) * np.exp(-measurement_discrepancy ** 2 / (2 * std_dev ** 2))
+        return norm_pdf
+
+    def rotate_around_point(self, particles: np.ndarray, angle_rad: float, center_point: tuple) -> np.ndarray:
+        """
+        Rotate numpy array points (in the first two columns) around a given point by a given angle in degrees.
+
+        Args:
+            particles (np.ndarray): numpy array where first two columns are x and y coordinates
+            angle_rad (float): angle to rotate in radians
+            center_point (tuple): tuple of (x, y) coordinates of rotation center
+        
+        Returns:
+            np.ndarray: Rotated numpy array
         """
 
         # Rotation matrix
@@ -386,15 +391,15 @@ class PFEngine:
 
         return particles
 
-    def xy_to_polar(self, xy_coords: np.ndarray):
+    def xy_to_polar(self, xy_coords: np.ndarray) -> np.ndarray:
         """
         Convert an array of xy coordinates to polar coordinates.
 
-        Parameters:
-        - xy_coords: numpy array of shape (n, 2) with columns (x, y)
+        Args:
+            xy_coords (np.ndarray): Array of shape (n, 2) with columns (x, y)
 
         Returns:
-        - polar_coords: numpy array of shape (n, 2) with columns (r, theta)
+            np.ndarray: Array of shape (n, 2) with columns (r, theta)
         """
 
         # Calculate r and theta
@@ -406,21 +411,17 @@ class PFEngine:
 
         return polar_coords
 
-    def calculate_num_particles(self, particles):
+    def calculate_num_particles(self, particles: np.ndarray) -> int:
         """
         Calculate the number of particles to use based on KLD-sampling.
 
         Args:
-        - particles (np.array): Array of shape (num_particles, 3) with columns (x, y, theta).
-        - epsilon (float): Maximum allowable error in K-L distance.
-        - delta (float): Desired confidence in the calculated number of particles.
-        - bin_size (tuple): Size of the bins in each dimension (x, y, theta).
-
+            particles (np.array): Array of shape (num_particles, 3) with columns (x, y, theta).
+        
         Returns:
-        - int: Number of particles for the next timestep.
+            int: Number of particles for the next timestep.
         """
-
-        # Create multi-dimensional grid
+        # Create 2-dimensional grid of bins
         x_bins = np.arange(particles[:, 0].min(), particles[:, 0].max() + self.bin_size, self.bin_size)
         y_bins = np.arange(particles[:, 1].min(), particles[:, 1].max() + self.bin_size, self.bin_size)
         theta_bins = np.arange(particles[:, 2].min(), particles[:, 2].max() + self.bin_angle, self.bin_angle)
@@ -449,7 +450,12 @@ class PFEngine:
         return int(np.ceil(n))
 
     def check_convergence(self):
-        """Check if the particles have converged to a single cluster using the histogram created for kld sampling."""
+        """
+        Check if the particles have converged to a single cluster using the histogram created for kld sampling.
+        
+        Returns:
+            bool: True if the particles have converged, False otherwise.
+        """
 
         hist = self.histogram
 
@@ -489,15 +495,15 @@ class PFEngine:
         else:
             return False
 
-    def downsample_particles(self, max_samples=10000):
+    def downsample_particles(self, max_samples: int = 10000) -> np.ndarray:
         """
         Downsample a 2D array of particles to a maximum number of samples.
 
-        Parameters:
-        - max_samples: int, maximum number of samples after downsampling
+        Args:
+            max_samples (int): The maximum number of samples to downsample to.
 
         Returns:
-        - Downsampled 2D numpy array of particles
+            np.ndarray: Downsampled 2D numpy array of particles.
         """
         num_particles = self.particles.shape[0]
         if num_particles <= max_samples:

@@ -15,8 +15,10 @@ def import_trunk_analyzer(width_estimation_config_file_path):
     config_file = "width_estimation_config_apple.yaml"
     return TrunkAnalyzer(PackagePaths(config_file), combine_segmenter=False), TrunkSegmenter(PackagePaths(config_file))
 
-# class for trunk data connection
 class TrunkDataConnection(QThread):
+    """
+    Thread to get the trunk data from the trunk width estimation package
+    """
     
     signal_save_calibration_data = pyqtSignal(dict)
     signal_request_processed = pyqtSignal(object)
@@ -27,24 +29,21 @@ class TrunkDataConnection(QThread):
     
     def __init__(self,
                  width_estimation_config_file_path: str = None,
-                #  seg_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
-                #  pre_filtered_segmentation_display_func: Callable[[Optional[np.ndarray]], None] = None,
-                #  original_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
-                #  message_printer: Callable[[List[str]], None] = None,
-                #  emitting_save_calibration_data=False
                  ):
-
+        """
+        Args:
+            width_estimation_config_file_path (str, optional): The path to the width estimation config file. Defaults to None.
+            class_mapping (tuple, optional): The mapping of classes for the trunk data. Defaults to (1, 2, 0).
+            offset (tuple, optional): The offset to apply to the positions. Defaults to (0, 0).
+        """
         self.init_trunk_analyzer(width_estimation_config_file_path)
 
         self.class_mapping = class_mapping
-        # self.seg_image_display_func = seg_image_display_func
-        # self.pre_filtered_segmentation_display_func = pre_filtered_segmentation_display_func
-        # self.original_image_display_func = original_image_display_func
         self.offset = offset
-        # self.message_printer = message_printer
         
+        # Start as -1 so they don't display, they are set externally in the main thread using a signal
         self.original_image_display_num = -1
         self.unfiltered_image_display_num = -1
         self.segmented_image_display_num = -1
@@ -64,8 +63,20 @@ class TrunkDataConnection(QThread):
         self.mutex = QMutex()
         
         super().__init__()
-    
+
+    def init_trunk_analyzer(self, width_estimation_config_file_path):
+        """
+        Initialize the trunk analyzer and segmenter
+        
+        Args:
+            width_estimation_config_file_path (str): The path to the width estimation config file"""
+        if width_estimation_config_file_path is not None:
+            self.trunk_analyzer, self.trunk_segmenter = import_trunk_analyzer(width_estimation_config_file_path)
+
     def run(self):
+        """
+        The main loop of the thread, waits for trunk data requests and processes them
+        """
         while True:
             self.mutex.lock()
             self.wait_condition.wait(self.mutex)
@@ -80,6 +91,9 @@ class TrunkDataConnection(QThread):
     
     @pyqtSlot(dict)
     def handle_request(self, request_data):
+        """ 
+        Receive a request for trunk data and saves the request data
+        """
         self.mutex.lock()
         self.current_msg = request_data["current_msg"]
         
@@ -90,13 +104,19 @@ class TrunkDataConnection(QThread):
         
         self.wait_condition.wakeAll()
         self.mutex.unlock()
-        
-    def init_trunk_analyzer(self, width_estimation_config_file_path):
-        if width_estimation_config_file_path is not None:
-            self.trunk_analyzer, self.trunk_segmenter = import_trunk_analyzer(width_estimation_config_file_path)
-
 
     def get_trunk_data(self, current_msg, return_seg_img=False):
+        """
+        Get the trunk data from the trunk width estimation package
+
+        Args:
+            current_msg (dict): The current message
+            return_seg_img (bool, optional): Whether to return the segmented image. Defaults to False.
+
+        Returns:
+            tuple: The positions, widths, class estimates, and segmented image if return_seg_img is True
+        """
+
         results_dict, results = self.trunk_segmenter.get_results(current_msg['rgb_image'])
 
         if self.unfiltered_image_display_num != -1:
@@ -124,6 +144,14 @@ class TrunkDataConnection(QThread):
             return self.positions, self.widths, self.class_estimates, self.seg_img
 
     def get_results(self, current_msg, results_dict, results):
+        """
+        Get the results from the trunk segmenter and analyzer
+
+        Args:
+            current_msg (dict): The current message
+            results_dict (dict): The results dictionary from the trunk segmenter
+            results (list): The results from the trunk segmenter
+        """
 
         self.positions, self.widths, self.class_estimates, self.x_positions_in_image, self.results_kept = (
             self.trunk_analyzer.get_width_estimation_pf(current_msg['depth_image'], results_dict=results_dict))
@@ -142,6 +170,15 @@ class TrunkDataConnection(QThread):
             self.class_estimates = self.remap_classes(self.class_estimates)
     
     def remap_classes(self, class_estimates):
+        """
+        Remap the classes from the trunk segmenter to the classes used in the localization package
+
+        Args:
+            class_estimates (np.array): The class estimates from the trunk segmenter
+
+        Returns:
+            np.array: The class estimates with the classes remapped
+        """
         class_estimates_copy = class_estimates.copy()
         for i, class_num in enumerate(self.class_mapping):
             class_estimates_copy[class_estimates == i] = class_num
@@ -149,6 +186,13 @@ class TrunkDataConnection(QThread):
         return class_estimates_copy
 
     def print_messages(self, positions, widths):
+        """
+        Print the messages for the positions and widths
+
+        Args:
+            positions (np.array): The positions of the trunks
+            widths (np.array): The widths of the trunks
+        """
         messages = []
 
         msg_str = "Widths: "
@@ -167,39 +211,78 @@ class TrunkDataConnection(QThread):
             
     
     def set_emitting_save_calibration_data(self, emitting_save_calibration_data):
+        """
+        Set whether to emit the save calibration data signal
+
+        Args:
+            emitting_save_calibration_data (bool): Whether to emit the save calibration data signal
+        """
         self.emitting_save_calibration_data = emitting_save_calibration_data
 
     @pyqtSlot(int)
     def set_segmented_image_display_num(self, segmented_image_display_num):
+        """
+        Slot to set the display position for the segmented image
+
+        Args:
+            segmented_image_display_num (int): The segmented image display number
+        """
         self.segmented_image_display_num = segmented_image_display_num
     
     @pyqtSlot(int)
     def set_unfiltered_image_display_num(self, unfiltered_image_display_num):
+        """
+        Slot to set the display position for the unfiltered image
+
+        Args:
+            unfiltered_image_display_num (int): The unfiltered image display number
+        """
         self.unfiltered_image_display_num = unfiltered_image_display_num
     
     @pyqtSlot(int)
     def set_original_image_display_num(self, original_image_display_num):
+        """
+        Slot to set the display position for the original image
+
+        Args:
+            original_image_display_num (int): The original image display number
+        """
         self.original_image_display_num = original_image_display_num
 
     
 
 
 class TrunkDataConnectionCachedData(TrunkDataConnection):
+    """
+    Extension of the TrunkDataConnection class that uses cached images instead of the bag images
+    """
+
     def __init__(self,
                  cached_img_directory,
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
                 ):
-
+        """
+        Args:
+            cached_img_directory (str): The directory containing the cached images
+            class_mapping (tuple, optional): The mapping of classes for the trunk data. Defaults to (1, 2, 0).
+            offset (tuple, optional): The offset to apply to the positions. Defaults to (0, 0).
+        """
         super().__init__(class_mapping=class_mapping, offset=offset)
 
         self.cached_img_directory = cached_img_directory
     
     def get_trunk_data(self, current_msg, return_seg_img=False):
-        
-        # print('hi1')
-        # print(current_msg)
+        """
+        Override the get_trunk_data method to get the trunk data from use the cached data files
 
+        Args:
+            current_msg (dict): The current message
+            return_seg_img (bool, optional): Whether to return the segmented image. Defaults to False.
+    
+        Returns:
+            tuple: The positions, widths, class estimates, and segmented image if return_seg_img is True
+        """
         if current_msg['data'] is None:
             return None, None, None
 
@@ -219,162 +302,18 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
         return self.positions, self.widths, self.class_estimates
 
     def load_cached_img(self, time_stamp):
+        """
+        Load the cached image from the cached image directory
+        
+        Args:
+            time_stamp (int): The time stamp of the image
+
+        Returns:
+            np.ndarray: The image
+        """
         time_stamp = str(int(1000*time_stamp))
         file_path = self.cached_img_directory + "/" + time_stamp + ".png"
         img = cv2.imread(file_path)
         return img
 
 
-class TrunkDataConnectionJetson(TrunkDataConnection):
-    def __init__(self,
-                 width_estimation_config_file_path: str = None,
-                 seg_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
-                 pre_filtered_segmentation_display_func: Callable[[Optional[np.ndarray]], None] = None,
-                 original_image_display_func: Callable[[Optional[np.ndarray]], None] = None,
-                 class_mapping=(1, 2, 0),
-                 offset=(0, 0),
-                 message_printer: Callable[[List[str]], None] = None):
-
-        super().__init__(width_estimation_config_file_path=None,
-                         seg_image_display_func=seg_image_display_func,
-                         pre_filtered_segmentation_display_func=pre_filtered_segmentation_display_func,
-                         original_image_display_func=original_image_display_func,
-                         class_mapping=class_mapping,
-                         offset=offset,
-                         message_printer=message_printer)
-
-        self.producer_thread = ProducerThread()
-        self.producer_thread.image_completed.connect(self.image_data_received)
-        self.producer_thread.start()
-
-        self.waiting_for_response = False
-
-        self.positions = None
-        self.widths = None
-        self.class_estimates = None
-        self.seg_img = None
-
-    def get_trunk_data(self, current_msg, return_seg_img=False):
-        
-        
-
-        self.waiting_for_response = True
-        self.producer_thread.send_images(current_msg['rgb_image'], current_msg['depth_image'])
-
-        start_time = time.time()
-
-        while self.waiting_for_response:
-            time.sleep(0.005)
-            QApplication.processEvents()
-            if time.time() - start_time > 2:
-                print("Timeout waiting for response")
-                if return_seg_img:
-                    return None, None, None, None
-                else:
-                    return None, None, None
-
-        print("Time to get response: ", time.time() - start_time)
-        if self.positions is not None:
-            self.print_messages(self.positions, self.widths)
-
-        if self.seg_img is None:
-            self.seg_img = current_msg['rgb_image']
-
-        if self.original_image_display_func is not None:
-            self.original_image_display_func(current_msg['rgb_image'])
-
-        if self.seg_image_display_func is not None:
-            self.seg_image_display_func(self.seg_img)
-
-        if return_seg_img:
-            return self.positions, self.widths, self.class_estimates, self.seg_img
-        else:
-            return self.positions, self.widths, self.class_estimates
-
-    def image_data_received(self, positions, widths, class_estimates, seg_img):
-        self.positions = positions
-        self.widths = widths
-        self.class_estimates = class_estimates
-        self.seg_img = seg_img
-
-        if self.class_estimates is not None:
-            self.class_estimates = self.remap_classes(self.class_estimates)
-
-        # print("Received data from producer thread")
-
-        self.waiting_for_response = False
-
-
-class ProducerThread(QThread):
-    image_completed = pyqtSignal(object, object, object, object)
-
-    def __init__(self, server_address=('localhost', 65432), parent=None):
-        super(ProducerThread, self).__init__(parent)
-        self.server_address = server_address
-        self.running = True
-        self.sock = None
-        self.queue = []
-        self.connected_to_consumer = False
-
-    def run(self):
-        while self.running:
-            try:
-                # Create a socket object
-                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.sock.connect(self.server_address)
-
-                self.connected_to_consumer = True
-
-                while self.running:
-                    if self.queue:
-                        rgb_image, depth_image = self.queue.pop(0)
-
-                        # Prepare data for sending
-                        data = {
-                            'rgb_image': rgb_image,
-                            'depth_image': depth_image
-                        }
-                        serialized_data = pickle.dumps(data)
-                        data_length = len(serialized_data)
-
-                        # Send the length of the serialized data first
-                        self.sock.sendall(struct.pack("I", data_length))
-                        # Send the serialized data
-                        self.sock.sendall(serialized_data)
-
-                        # Receive data from the consumer
-                        ack_length = struct.unpack("I", self.sock.recv(4))[0]
-                        ack_data = b''
-                        while len(ack_data) < ack_length:
-                            ack_data += self.sock.recv(ack_length - len(ack_data))
-
-                        if ack_data:
-                            response = pickle.loads(ack_data)
-                            positions = response["positions"]
-                            widths = response["widths"]
-                            class_estimates = response["class_estimates"]
-                            seg_img = response["seg_img"]
-
-                            if positions is not None:
-                                self.image_completed.emit(positions, widths, class_estimates, seg_img)
-                            else:
-                                self.image_completed.emit(None, None, None, None)
-                    else:
-                        self.msleep(5)  # Sleep for a short period to avoid busy waiting
-            except (ConnectionRefusedError, BrokenPipeError):
-                print("Connection error, retrying in 5 seconds...")
-                self.msleep(5000)
-            finally:
-                self.connected_to_consumer = False
-                if self.sock:
-                    self.sock.close()
-
-    @pyqtSlot(np.ndarray, np.ndarray)
-    def send_images(self, rgb_image, depth_image):
-        self.queue.append((rgb_image, depth_image))
-
-    def stop(self):
-        self.connected_to_consumer = False
-        self.running = False
-        self.quit()
-        self.wait()

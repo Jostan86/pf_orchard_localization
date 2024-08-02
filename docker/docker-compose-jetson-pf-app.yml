@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  pf_orchard_localization:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.jetson
+    volumes:
+      - ../:/home/vscode/pf_orchard_localization:rw
+      # - /media/jostan:/media/jostan:rw
+      - /home/jostan/Documents/app_data:/home/vscode/app_data:rw
+    # privileged: true
+    network_mode: "host"
+    runtime: nvidia
+    ipc: "host"
+    user: vscode
+    command: ["python3", "/home/vscode/pf_orchard_localization/scripts/run_pf_bag_app.py"]
+

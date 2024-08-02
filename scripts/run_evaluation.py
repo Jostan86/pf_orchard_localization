@@ -1,4 +1,4 @@
-from pf_orchard_localization.pf_engine import PFEngine
+from pf_orchard_localization.pf_engine import PfEngine
 from map_data_tools import MapData
 from pf_orchard_localization.utils import ParametersPf
 from pf_orchard_localization.utils.pf_evaluation import PfTestExecutor
@@ -14,7 +14,7 @@ cached_data_files_directory = "/media/jostan/portabits/pf_app_data/pf_cached_dat
 map_data_path = "/media/jostan/portabits/pf_app_data/map_data_jazz_new.json"
 map_data = MapData(map_data_path=map_data_path, move_origin=True, origin_offset=(5, 5))
 
-pf_engine = PFEngine(map_data=map_data)
+pf_engine = PfEngine(map_data=map_data)
 
 class_mapping = (1, 2, 0)
 

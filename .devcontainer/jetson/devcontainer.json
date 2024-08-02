@@ -1,24 +1,23 @@
+
 {
   "name": "particle_filter_localization_jetson",
-  "dockerFile": "Dockerfile",
-  "extensions": [
-    "ms-python.python",
-    "eamodio.gitlens",
-    "ms-azuretools.vscode-docker"
+  "dockerComposeFile": [
+    "../../docker/docker-compose-jetson-pf-app.yml" 
   ],
-  "runArgs": [
-    "--privileged",
-    "--network=host",
-    "--runtime=nvidia",
-    "--volume", "/media/jostan:/media/jostan",
-    "--ipc=host",
-    "-p", "65432:65432",
-    "--env", "DISPLAY"
-  ],
-  "workspaceMount": "source=${localWorkspaceFolder},target=/${localWorkspaceFolderBasename},type=bind",
-  "workspaceFolder": "/${localWorkspaceFolderBasename}",
+  "service": "pf_orchard_localization",
+  "workspaceFolder": "/home/vscode/pf_orchard_localization",
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/vscode/.bash_history,type=bind"
   ],
-  "remoteUser": "vscode"
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-containers"
+      ]
+    }
+  },
+  "overrideCommand": true
 }

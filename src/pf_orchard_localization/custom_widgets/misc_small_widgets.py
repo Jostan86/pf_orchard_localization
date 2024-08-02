@@ -13,12 +13,18 @@ import json
 import os
 import copy
 
+
 class PfMainWindow(QMainWindow):
+    """
+    Main window for the particle filter application
+    """
+
     def __init__(self):
-        """Constructs the GUI for the particle filter app"""
         super().__init__()
 
     def init_window_display_settings(self):
+        """Initializes the window display settings"""
+
         self.setGeometry(0, 0, 1700, 900)
 
         # # Access the primary screen
@@ -41,13 +47,17 @@ class PfMainWindow(QMainWindow):
         logging.debug(f"App size: {self.width()} x {self.height()}")
         logging.debug(f"App position: {self.x()} x {self.y()}")
 
+
 class PfChangeParametersButton(QWidget):
+    """
+    Widget for changing the particle filter parameters
+    """
+
     def __init__(self, main_app_manager):
         super().__init__()
 
         self.main_app_manager = main_app_manager
 
-        # Button to trigger popup to adjust pf settings
         self.adjust_pf_settings_button = QPushButton("Change Particle Filter Parameters")
         self.adjust_pf_settings_button.setToolTip("Adjust the particle filter parameters")
         self.adjust_pf_settings_button.setFixedWidth(300)
@@ -61,42 +71,44 @@ class PfChangeParametersButton(QWidget):
         self.adjust_pf_settings_button.clicked.connect(self.adjust_pf_settings)
 
     def adjust_pf_settings(self):
-            # Method for adjusting the particle filter settings by opening a settings dialog
-            pf_active = self.main_app_manager.get_pf_active()
+        """
+        Adjust the particle filter settings
+        """
+            
+        pf_active = self.main_app_manager.get_pf_active()
 
-            if pf_active:
-                self.main_app_manager.print_message("Cannot adjust settings while PF is running")
-                return
+        if pf_active:
+            self.main_app_manager.print_message("Cannot adjust settings while PF is running")
+            return
 
-            parameters_pf = self.main_app_manager.get_pf_parameters()
+        parameters_pf = self.main_app_manager.get_pf_parameters()
 
-            settings_dialog = PfSettingsDialog(current_settings=parameters_pf)
+        settings_dialog = PfSettingsDialog(current_settings=parameters_pf)
 
-            # if settings_dialog.exec() == QDialog.DialogCode.Accepted: # Qt6
-            if settings_dialog.exec() == QDialog.Accepted:
-                new_settings = settings_dialog.get_settings()
-                if new_settings is None:
-                    self.main_app_manager.print_message("Update Failed")
-                    return
-            else:
+        # if settings_dialog.exec() == QDialog.DialogCode.Accepted: # Qt6
+        if settings_dialog.exec() == QDialog.Accepted:
+            new_settings = settings_dialog.get_settings()
+            if new_settings is None:
                 self.main_app_manager.print_message("Update Failed")
                 return
+        else:
+            self.main_app_manager.print_message("Update Failed")
+            return
 
-            success = self.main_app_manager.set_pf_parameters(new_settings)
-            if success:
-                self.main_app_manager.print_message("Update Successful")
-                self.main_app_manager.display_pf_settings()
-                self.main_app_manager.reset_pf()
-            else:
-                self.main_app_manager.print_message("Update Failed")
+        success = self.main_app_manager.set_pf_parameters(new_settings)
+        if success:
+            self.main_app_manager.print_message("Update Successful")
+            self.main_app_manager.display_pf_settings()
+            self.main_app_manager.reset_pf()
+        else:
+            self.main_app_manager.print_message("Update Failed")
 
-    def disable(self):
-        self.adjust_pf_settings_button.setDisabled(True)
-
-    def enable(self):
-        self.adjust_pf_settings_button.setDisabled(False)
 
 class PfControlButtons(QWidget):
+    """
+    Widget to setup the buttons for controlling the particle filter
+    """
+
     startButtonClicked = pyqtSignal()
     stopButtonClicked = pyqtSignal()
 
@@ -105,7 +117,6 @@ class PfControlButtons(QWidget):
 
         self.main_app_manager = main_app_manager
 
-        # Button to reset the particle filter
         self.reset_button = QPushButton("Reset PF")
         self.reset_button.setToolTip("Reset the particle filter")
 
@@ -115,10 +126,14 @@ class PfControlButtons(QWidget):
         self.single_step_button = QPushButton("Take Step")
         self.single_step_button.setToolTip("Continue the next step in the particle filter")
 
+        self.center_on_gps_button = QPushButton("Center on GPS")
+        self.center_on_gps_button.setToolTip("Center the particles on the GPS location")
+
         self.top_layer_layout = QHBoxLayout()
         self.top_layer_layout.addWidget(self.start_stop_button)
         self.top_layer_layout.addWidget(self.single_step_button)
         self.top_layer_layout.addWidget(self.reset_button)
+        self.top_layer_layout.addWidget(self.center_on_gps_button)
 
         self.num_particles_label = QLabel("0")
         self.num_particles_layout = QHBoxLayout()
@@ -135,33 +150,44 @@ class PfControlButtons(QWidget):
         self.start_stop_button.clicked.connect(self.start_stop_button_clicked)
 
     def set_num_particles(self, num_particles):
-        self.num_particles_label.setText(str(num_particles))
+        """
+        Set the number of particles label
         
+        Args:
+            num_particles (int): Number of particles
+        """
+        self.num_particles_label.setText(str(num_particles))
+    
+    @pyqtSlot()
     def start_stop_button_clicked(self):
+        """
+        Slot for when the start/stop button is clicked
+        """
         if self.start_stop_button.text() == "Start":
             self.startButtonClicked.emit()
         elif self.start_stop_button.text() == "Stop":
             self.stopButtonClicked.emit()
 
-    def disable(self):
-        self.reset_button.setDisabled(True)
-        self.adjust_pf_settings_button.setDisabled(True)
-        self.start_stop_button.setDisabled(True)
-
-    def enable(self):
-        self.reset_button.setDisabled(False)
-        self.adjust_pf_settings_button.setDisabled(False)
-        self.start_stop_button.setDisabled(False)
-
     def set_start(self):
+        """
+        Set the button to 'Start'
+        """
         self.start_stop_button.setText("Start")
         self.start_stop_button.setToolTip("Start the particle filter")
 
     def set_stop(self):
+        """
+        Set the button to 'Stop'
+        """
         self.start_stop_button.setText("Stop")
         self.start_stop_button.setToolTip("Stop the particle filter")
 
+
 class PfStartLocationControls(QWidget):
+    """
+    Widget for setting the starting state of the particles
+    """
+
     def __init__(self, main_app_manager):
         super().__init__()
 
@@ -221,7 +247,13 @@ class PfStartLocationControls(QWidget):
 
         self.set_parameters()
 
+        self.gps_x = None
+        self.gps_y = None
+
     def set_parameters(self):
+        """
+        Set the parameters from the main app manager
+        """
         pf_settings = self.main_app_manager.get_pf_parameters()
         self.start_x_input.setText(str(pf_settings.start_pose_center_x))
         self.start_y_input.setText(str(pf_settings.start_pose_center_y))
@@ -232,6 +264,9 @@ class PfStartLocationControls(QWidget):
         self.start_height_input.setText(str(pf_settings.start_height))
 
     def get_parameters(self):
+        """
+        Get the parameters from the GUI and (try to) set the main app manager parameters
+        """
         current_settings = self.main_app_manager.get_pf_parameters()
         current_settings.start_pose_center_x = float(self.start_x_input.text())
         current_settings.start_pose_center_y = float(self.start_y_input.text())
@@ -246,10 +281,39 @@ class PfStartLocationControls(QWidget):
         if not success:
             self.main_app_manager.print_message("Failed to set start location parameters")
 
-    def set_start_location_from_plot_click(self, x, y, shift_pressed):
-        # Method for handling when the plot is clicked, if shift is held down, set the particle start position to the
-        # clicked location
+    @pyqtSlot(dict)
+    def set_gps_position(self, gps_data):
+        """
+        Set the GPS position from the GPS data
+        """
+        self.gps_x = gps_data['easting']
+        self.gps_y = gps_data['northing']
 
+    def set_start_location_from_gps(self):
+        """
+        Set the start center location to the GPS location
+        """
+
+        if self.gps_x is None or self.gps_y is None:
+            self.main_app_manager.print_message("No GPS data available")
+            return
+        
+        # Check if the GPS data is out of range, TODO: make this a setting or somehow automated
+        if -25 < self.gps_x > 100 or -25 < self.gps_y > 180:
+            self.main_app_manager.print_message("GPS data appears out of range")
+            return
+        
+        self.set_start_location_from_plot_click(self.gps_x, self.gps_y, True)
+
+    def set_start_location_from_plot_click(self, x, y, shift_pressed):
+        """
+        Set the start location from a plot click if shift is pressed
+
+        Args:
+            x (float): x coordinate of the click
+            y (float): y coordinate of the click
+            shift_pressed (bool): True if shift is pressed
+        """
         if self.main_app_manager.get_pf_active():
             return
         if x is None:
@@ -265,6 +329,12 @@ class PfStartLocationControls(QWidget):
 
 
     def setReadOnly(self, read_only=True):
+        """
+        Set the widget to read only mode
+
+        Args:
+            read_only (bool): True to set the widget to read only, False to set it to read/write
+        """
         self.start_x_input.setReadOnly(read_only)
         self.start_y_input.setReadOnly(read_only)
         self.rotation_input.setReadOnly(read_only)
@@ -273,13 +343,22 @@ class PfStartLocationControls(QWidget):
         self.start_width_input.setReadOnly(read_only)
         self.start_height_input.setReadOnly(read_only)
 
+
 class PfCheckBoxes(QWidget):
+    """
+    Widget for setting the checkboxes for the particle filter app
+    """
+
     def __init__(self):
         super().__init__()
         self.all_checkbox_info = []
         self.num_boxes_per_row = 3
 
     def init_checkboxes(self):
+        """
+        Initialize the checkboxes in the all_checkbox_info list, these must be added externally
+        """
+
         num_checkboxes = len(self.all_checkbox_info)
         num_rows = math.ceil(num_checkboxes/self.num_boxes_per_row)
 
@@ -299,17 +378,11 @@ class PfCheckBoxes(QWidget):
 
         self.setLayout(self.checkbox_overall_layout)
 
-    def disable(self):
-        for checkbox_info in self.all_checkbox_info:
-            getattr(self, checkbox_info[0]).setDisabled(True)
-
-    def enable(self):
-        for checkbox_info in self.all_checkbox_info:
-            getattr(self, checkbox_info[0]).setDisabled(False)
-
-
 
 class Console(QWidget):
+    """
+    Console widget for displaying messages in the pf app
+    """
     def __init__(self):
         super().__init__()
 
@@ -326,30 +399,33 @@ class Console(QWidget):
         self.setLayout(self.console_layout)
 
     def __call__(self, message):
+        """
+        Override the call method to print a message
+        """
         self.print_message(message)
 
     def print_message(self, message):
+        """
+        Print a message to the console by appending it to the end
+
+        Args:
+            message (str): Message to print
+        """
         self.console.appendPlainText(message)
 
-    def print_time_message(self, time_s, msg, ms=True):
-        time_tot = (time.time() - time_s)
-        if ms:
-            time_tot = time_tot * 1000
-        time_tot = round(time_tot, 1)
-        if ms:
-            msg_str = msg + str(time_tot) + "ms"
-        else:
-            msg_str = msg + str(time_tot) + "s"
-        self.print_message(msg_str)
-
-    def disable(self):
-        self.clear_console_button.setDisabled(True)
-
-    def enable(self):
-        self.clear_console_button.setDisabled(False)
-
 class ImageDisplay(QWidget):
+    """
+    Widget for displaying images
+    """
     def __init__(self, num_camera_feeds=1, image_size=(480, 640), scale_factor=1.5):
+        """
+        Initialize the image display widget
+        
+        Args:
+            num_camera_feeds (int): Number of camera feeds to display
+            image_size (tuple): Size of the image to display
+            scale_factor (float): Scale factor to apply to the image
+            """
         super().__init__()
 
         logging.debug(f"Starting Image Display with {num_camera_feeds} camera feeds, image size {image_size}, scale factor {scale_factor}")
@@ -377,13 +453,10 @@ class ImageDisplay(QWidget):
     def load_image(self, img=None, img_num=0):
         """
         Load an image into the GUI image viewer
-        Parameters
-        ----------
-        img : OpenCV image
-
-        Returns None
-        -------
-
+        
+        Args:
+            img (np.array): Image to load
+            img_num (int): Position to load the image into
         """
         # If image is none make a blank image
         if img is None:
@@ -404,17 +477,19 @@ class ImageDisplay(QWidget):
 
         QApplication.processEvents()
 
-    def disable(self):
-        for label in self.picture_labels:
-            label.setDisabled(True)
-
-    def enable(self):
-        for label in self.picture_labels:
-            label.setDisabled(False)
-
 
 class PfModeSelector(QWidget):
+    """
+    Widget for selecting the mode to run
+    """
     def __init__(self, mode_options=()):
+        """
+        Initialize the mode selector widget
+
+        Args:
+            mode_options (list): List of mode options to display
+        """
+
         super().__init__()
 
         logging.debug(f"Starting Mode Selector with options {mode_options}")
@@ -432,22 +507,33 @@ class PfModeSelector(QWidget):
         self.setLayout(mode_selector_layout)
 
     def set_modes(self, modes):
+        """
+        Set the modes in the mode selector
+
+        Args:
+            modes (list): List of modes to set
+        """
+
         self.mode_selector.clear()
         for mode in modes:
             self.mode_selector.addItem(mode.mode_name)
 
     @property
     def mode(self):
+        """
+        Get the current mode selected
+
+        Returns:
+            str: The current mode selected
+        """
         return self.mode_selector.currentText()
-
-    def disable(self):
-        self.mode_selector.setDisabled(True)
-
-    def enable(self):
-        self.mode_selector.setDisabled(False)
 
 
 class ImageBrowsingControls(QWidget):
+    """
+    Widget for controlling the image browsing in the playback mode
+    """
+
     playButtonClicked = pyqtSignal()
     stopButtonClicked = pyqtSignal()
 
@@ -491,6 +577,12 @@ class ImageBrowsingControls(QWidget):
         self.save_location_change_button.clicked.connect(self.change_save_location)
 
     def set_playing(self, playing: bool):
+        """
+        Set the playing state of the widget, Stop if playing, Play if not
+        
+        Args:
+            playing (bool): True if playing, False if not
+        """
         if playing:
             self.play_fwd_button.setText("Stop")
         else:
@@ -498,62 +590,40 @@ class ImageBrowsingControls(QWidget):
         self.previous_button.setDisabled(playing)
         self.next_button.setDisabled(playing)
         self.save_button.setDisabled(playing)
-        
+    
+    @pyqtSlot()
     def play_button_clicked(self):
+        """
+        Slot for when the play button is clicked. If the button is play, emit the play signal, if it's stop, emit the stop signal
+        """
         if self.play_fwd_button.text() == "Play":
             self.playButtonClicked.emit()
         else:
             self.stopButtonClicked.emit()
 
     def change_save_location(self):
+        """
+        Change the save location for the images
+        """
         save_location = QFileDialog.getExistingDirectory(self, "Select Save Location") + "/"
         self.save_location_input.setText(save_location)
 
     @property
     def save_location(self):
+        """
+        Get the save location
+
+        Returns:
+            str: The save location
+        """
         return self.save_location_input.text()
 
-    def disable(self):
-        self.previous_button.setDisabled(True)
-        self.next_button.setDisabled(True)
-        self.play_fwd_button.setDisabled(True)
-        self.save_button.setDisabled(True)
-
-    def enable(self):
-        self.previous_button.setDisabled(False)
-        self.next_button.setDisabled(False)
-        self.play_fwd_button.setDisabled(False)
-        self.save_button.setDisabled(False)
-
-# class DataFileTimeLine(QWidget):
-#     def __init__(self):
-#         super().__init__()
-
-#         self.data_file_time_line = QLineEdit()
-#         self.data_file_time_line.setFixedWidth(150)
-
-#         label = QLabel("Current Data File Time:")
-#         label.setFixedWidth(175)
-
-#         self.data_file_time_line_layout = QHBoxLayout()
-#         self.data_file_time_line_layout.addWidget(label)
-#         self.data_file_time_line_layout.addWidget(self.data_file_time_line)
-
-#         self.setFixedWidth(350)
-
-#         self.setLayout(self.data_file_time_line_layout)
-
-#     def set_time_line(self, time_stamp: float):
-#         time_stamp = round(time_stamp, 2)
-#         self.data_file_time_line.setText(str(time_stamp))
-
-#     def disable(self):
-#         self.data_file_time_line.setDisabled(True)
-
-#     def enable(self):
-#         self.data_file_time_line.setDisabled(False)
 
 class ImageNumberLabel(QWidget):
+    """
+    Widget for displaying the image number when using recorded data
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -569,15 +639,21 @@ class ImageNumberLabel(QWidget):
 
     @pyqtSlot(int, int)
     def set_img_number_label(self, img_number, total_imgs):
+        """
+        Set the image number label
+
+        Args:
+            img_number (int): The current image number
+            total_imgs (int): The total number of images
+        """
         self.img_number_label.setText("Image " + str(img_number) + " of " + str(total_imgs))
 
-    def disable(self):
-        self.img_number_label.setDisabled(True)
-
-    def enable(self):
-        self.img_number_label.setDisabled(False)
 
 class ImageDelaySlider(QWidget):
+    """
+    Widget for setting the added delay between images when using recorded data
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -610,18 +686,25 @@ class ImageDelaySlider(QWidget):
         self.slider.valueChanged.connect(self.update_value_label)
 
     def update_value_label(self):
+        """
+        Update the value label to the current value of the slider
+        """
         self.value_label.setText(str(self.slider.value()) + "ms")
 
     def get_delay_ms(self):
+        """
+        Get the delay in ms
+
+        Returns:
+            int: The delay in ms
+        """
         return self.slider.value()
 
-    def disable(self):
-        self.slider.setDisabled(True)
-
-    def enable(self):
-        self.slider.setDisabled(False)
-
 class PfQueueSizeLabel(QWidget):
+    """
+    Widget for displaying the size of the image queue
+    """
+
     def __init__(self):
         super().__init__()
 
@@ -634,18 +717,26 @@ class PfQueueSizeLabel(QWidget):
         self.setLayout(self.queue_size_layout)
 
     def set_queue_size(self, queue_size):
+        """
+        Set the queue size label
+
+        Args:
+            queue_size (int): The size of the queue
+        """
         self.queue_size_label.setText("Queue Size: " + str(queue_size))
-
-    def disable(self):
-        self.queue_size_label.setDisabled(True)
-
-    def enable(self):
-        self.queue_size_label.setDisabled(False)
-
 
 
 class CachedDataCreator(QWidget):
+    """
+    Widget to aid in cacheing data in the app 
+    """
     def __init__(self, main_app_manager):
+        """
+        Initialize the widget
+        
+        Args:
+            main_app_manager (PfMainAppManager): Main app manager
+        """
         super().__init__()
 
         self.main_app_manager = main_app_manager
@@ -728,20 +819,43 @@ class CachedDataCreator(QWidget):
 
         self.cache_data_checkbox_changed()
 
+    @pyqtSlot()
     def change_save_directory(self):
+        """
+        Slot for the changing the save directory for the cached data when the button is clicked
+        """
         save_location = QFileDialog.getExistingDirectory(self, "Select Save Location") + "/"
         self.save_directory_input.setText(save_location)
         # check for "images" folder, if it doesn't exist, create it
 
+    @pyqtSlot()
     def reset_cache(self):
+        """
+        Slot for resetting the cache when the button is clicked
+        """
         self.cache = {}
         self.cache_size_label.setText("Cache Size: 0 messages")
 
     def get_timestamp_str(self, time_stamp):
+        """
+        Get the timestamp as a string
+
+        Args:
+            time_stamp (float): Time stamp
+        
+        Returns:
+            str: The time stamp as a string
+        """
         return str(time_stamp*1000).split(".")[0]
     
     @pyqtSlot(dict)
     def cache_data(self, msg):
+        """
+        Slot for caching data when it's received
+        
+        Args:
+            msg (dict): The message to cache
+        """
         if msg['topic'] == "odom":
             self.cache_odom_data(msg['x_odom'], msg['theta_odom'], msg['time_stamp'])
             
@@ -753,10 +867,28 @@ class CachedDataCreator(QWidget):
                 
     
     def cache_odom_data(self, x_odom, theta_odom, time_stamp_odom):
+        """
+        Cache the odometry data
+
+        Args:
+            x_odom (float): X position of the odometry
+            theta_odom (float): Theta position of the odometry
+            time_stamp_odom (float): Time stamp of the odometry
+        """
         self.cache[self.get_timestamp_str(time_stamp_odom)] = {"x_odom": x_odom, "theta_odom": theta_odom, "time_stamp": time_stamp_odom}
         self.cache_size_label.setText("Cache Size: " + str(len(self.cache)) + " messages")
 
     def cache_tree_data(self, positions, widths, class_estimates, location_estimate, time_stamp):
+        """
+        Cache the tree data
+
+        Args:
+            positions (np.array): Positions of the trees
+            widths (np.array): Widths of the trees
+            class_estimates (np.array): Class estimates of the trees
+            location_estimate (np.array): Location estimate of the trees
+            time_stamp (float): Time stamp of the tree data
+        """
         if positions is None:
             self.cache[self.get_timestamp_str(time_stamp)] = None
             return
@@ -764,7 +896,11 @@ class CachedDataCreator(QWidget):
         location_estimate = {"x": location_estimate[0], "y": location_estimate[1], "theta": location_estimate[2]}
         self.cache[self.get_timestamp_str(time_stamp)] = {"tree_data": tree_data, "location_estimate": location_estimate}
 
+    @pyqtSlot()
     def save_cache(self):
+        """
+        Slot for saving the cache when the button is clicked. Does some check to ensure the save location is valid
+        """
         if len(self.cache) == 0:
             self.main_app_manager.print_message("No data to save")
             return
@@ -802,6 +938,13 @@ class CachedDataCreator(QWidget):
         self.main_app_manager.print_message("Cache saved to: " + save_location)
 
     def save_image(self, img, time_stamp):
+        """
+        Save an image to the save location
+
+        Args:
+            img (np.array): Image to save
+            time_stamp (float): Time stamp of the image
+        """
         if self.save_images_checkbox.isChecked() == False:
             self.main_app_manager.print_message("Images not being saved")
             return
@@ -821,7 +964,11 @@ class CachedDataCreator(QWidget):
 
         cv2.imwrite(save_location, img)
 
+    @pyqtSlot()
     def cache_data_checkbox_changed(self):
+        """
+        Slot for when the cache data checkbox is changed
+        """
         if self.enable_checkbox.isChecked():
             self.cache_data_enabled = True
             self.set_input_disabled(False)
@@ -831,6 +978,12 @@ class CachedDataCreator(QWidget):
             self.set_input_disabled(True)
 
     def set_input_disabled(self, disabled):
+        """
+        Set the input to disabled or not
+
+        Args:
+            disabled (bool): True to disable input, False to enable
+        """
         self.save_images_checkbox.setDisabled(disabled)
         self.save_directory_input.setDisabled(disabled)
         self.change_save_directory_button.setDisabled(disabled)
@@ -840,18 +993,22 @@ class CachedDataCreator(QWidget):
         self.cache_size_label.setDisabled(disabled)
         self.file_name_label.setDisabled(disabled)
         self.save_label.setDisabled(disabled)
-        
-
-    def enable (self):
-        self.enable_checkbox.setDisabled(False)
-        self.set_input_disabled(False)
-
-    def disable(self):
-        self.enable_checkbox.setDisabled(True)
-        self.set_input_disabled(True)
 
 class CalibrationDataControls(QWidget):
+    """
+    Widget for creating/saving calibration data. Where the 'calibration data' is an rgb image, depth image, and ground
+    truth width and x position in the image of a tree. Therefore only images of trees with a ground truth width (which
+    is stored in the map data) can be saved as calibration data. This data can then be used to tune the trunk width
+    estimation algorithm.
+    """
+
     def __init__(self, main_app_manager):
+        """
+        Initialize the widget
+
+        Args:
+            main_app_manager (PfMainAppManager): Main app manager
+        """
         super().__init__()
         self.main_app_manager = main_app_manager
 
@@ -906,13 +1063,28 @@ class CalibrationDataControls(QWidget):
         self.change_save_location_button.clicked.connect(self.change_save_location)
         self.save_data_checkbox.stateChanged.connect(self.save_data_checkbox_changed)
         
-        
-        self.image_x_positions = None
         self.previous_x_position_in_image = None
         
-
     @pyqtSlot(dict)
     def save_data(self, current_msg):
+        """
+        This function will be called if the save calibration mode is active and the save data checkbox is checked. It first 
+        check if a tree was seen, and if so it assumes the best particle is correct and finds the corresponding tree in the
+        map data. It then saves the rgb image, depth image, and some data about the tree to the save location if there is 
+        a ground truth width for the tree. The images are saved as the timestamp of the data, and the data is saved in a
+        json file with the following fields:
+        - tree_number: The tree number in the map data
+        - tree_position: The position of the tree in lat, lon
+        - note: A note about the data
+        - ground_truth_width: The ground truth width of the tree
+        - test_tree_number: The test tree number of the tree
+        - ground_truth_date: The ground truth date of the data
+        - x_position_in_image: The x position of the tree in the image
+        - measured_width: The measured width of the tree  
+
+        Args:
+            current_msg (dict): The current message
+        """
         
         x_positions_in_image = current_msg["x_positions_in_image"]
 
@@ -993,6 +1165,13 @@ class CalibrationDataControls(QWidget):
         self.main_app_manager.print_message("Data saved to: " + data_save_location)
 
     def find_closest_tree(self):
+        """
+        Find the closest tree to the best particle and return the tree data and the index of the tree in the trunk data
+
+        Returns:
+            list: List of the closest tree data
+            list: List of the index of the tree in the trunk data
+        """
         tree_positions = self.main_app_manager.trunk_data_connection.positions
         class_estimates = self.main_app_manager.trunk_data_connection.class_estimates
         best_particle = self.main_app_manager.pf_engine.best_particle
@@ -1026,19 +1205,21 @@ class CalibrationDataControls(QWidget):
 
         return closest_objects, kept_idx
 
-    @pyqtSlot(dict, object)
-    def receive_img_x_position(self, x_position):
-        self.image_x_positions = x_position
-        
-    @property
-    def save_data_enabled(self):
-        return self.save_data_checkbox.isChecked()
-
+    @pyqtSlot()
     def change_save_location(self):
+        """
+        Slot that opens a dialog to change the save location for the calibration data when the button is clicked
+        """
         save_location = QFileDialog.getExistingDirectory(self, "Select Save Location") + "/"
         self.save_location_input.setText(save_location)
 
     def set_running(self, running):
+        """
+        Set the widget to running mode
+
+        Args:
+            running (bool): True to set the widget to running mode, False to set it to not running mode
+        """
         self.save_data_checkbox.setDisabled(running)
         self.save_location_input.setDisabled(running)
         self.change_save_location_button.setDisabled(running)
@@ -1046,12 +1227,21 @@ class CalibrationDataControls(QWidget):
         self.date_edit.setDisabled(running)
     
     def hide(self):
+        """
+        Extend the hide method to ensure the the save data checkbox is unchecked
+        """ 
         self.save_data_checkbox.setChecked(False)
         super().hide()
 
     @pyqtSlot(int)
     def save_data_checkbox_changed(self, check_state):
-        
+        """
+        Slot for when the save data checkbox is changed. Sets the main app manager to save calibration data if checked
+
+        Args:
+            check_state (int): The state of the checkbox
+        """
+
         checked = self.save_data_checkbox.isChecked()
                     
         if checked:

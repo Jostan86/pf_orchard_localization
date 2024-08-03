@@ -6,28 +6,17 @@ initial_data_time: 0  # seconds into the bag file
 initial_data_file_index: 0  # index of the bag file
 
 # ----------------------
-# Bi-axe orchard
-# ----------------------
-
-# ----------------------
-# Cherry orchard
-# ----------------------
-
-# ----------------------
 # Jazz apple orchard
 # ----------------------
-pf_config_file_path: /pf_orchard_localization/config/parameters_pf.yaml
-# pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
+pf_config_file_path: /home/vscode/pf_orchard_localization/config/parameters_pf.yaml
+map_data_path: /home/vscode/app_data/map_data_jazz_new.json
 
-map_data_path: /media/jostan/portabits/pf_app_data/map_data_jazz_new.json
+data_file_dir: /home/vscode/app_data/pf_cached_data/pf_data/
 
-data_file_dir: /media/jostan/portabits/pf_app_data/pf_cached_data/pf_data/
-cached_image_dir: /media/jostan/portabits/pf_app_data/pf_cached_data/images/
+cached_image_dir: /home/vscode/app_data/pf_cached_data/images
 
-test_start_info_path: /media/jostan/portabits/pf_app_data/test_starts2.csv
-# jetson
-#pf_config_file_path: /pf_orchard_localization/particle-filter-app/config/parameters_pf.yaml
-#map_data_path: /media/jostan/portabits/pf_app_data/map_data_jazz_new.json
-#
-#data_file_dir: /media/jostan/portabits/pf_app_data/pf_cached_data/pf_data/
-#cached_image_dir: /media/jostan/portabits/pf_app_data/pf_cached_data/images/
+test_start_info_path: /home/vscode/app_data/test_starts2.csv
+
+image_fps: 10
+
+use_visual_odom: False

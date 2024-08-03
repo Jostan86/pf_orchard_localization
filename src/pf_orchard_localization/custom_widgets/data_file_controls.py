@@ -260,7 +260,7 @@ class DataFileControls(QWidget):
             bool: Whether the data file is valid
         """
         if not os.path.isfile(data_file_path) and not os.path.isdir(data_file_path):
-            return False, "Invalid file name"
+            return False, "Invalid file path"
         elif data_file_path.endswith(".json") and not self.using_cached_data:
             return False, "Invalid file type, not using cached data"
         elif data_file_path.endswith(".json") and self.using_cached_data:

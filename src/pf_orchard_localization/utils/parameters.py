@@ -110,6 +110,8 @@ class ParametersCachedData(Parameters):
     pf_config_file_path: str = None
     map_data_path: str = None
 
+    image_fps: int = None
+    use_visual_odom: bool = False
 
 @dataclass
 class ParametersBagData(Parameters):
@@ -130,6 +132,9 @@ class ParametersBagData(Parameters):
     image_save_dir: str = None
 
     image_display_scale: float = None
+
+    use_ros_service_for_trunk_width: bool = False
+    use_visual_odom: bool = False
 
 @dataclass
 class ParametersLiveData(Parameters):

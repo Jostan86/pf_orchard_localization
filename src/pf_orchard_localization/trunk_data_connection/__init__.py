@@ -4,5 +4,5 @@ from .trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCache
 try:
     from .trunk_data_connection_ros import TrunkDataConnectionRosService, TrunkDataConnectionRosSub
 except ImportError:
-    print("Unable to import TrunkDataConnectionRosService, ROS2 is likely not installed")
+    print("Unable to import TrunkDataConnectionRosService, ROS2 is likely not installed or pf_orchard_interfaces package is missing")
     pass

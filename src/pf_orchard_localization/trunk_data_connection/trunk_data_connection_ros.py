@@ -32,6 +32,12 @@ class TrunkDataConnectionRosService(TrunkDataConnection):
         super().__init__(class_mapping=class_mapping, offset=offset)
         
         self.bridge = CvBridge()
+    
+    def init_trunk_analyzer(self, width_estimation_config_file_path):
+        """
+        Overrides the init_trunk_analyzer method because it is not needed for the ROS service
+        """
+        pass
         
     def run(self):
         """

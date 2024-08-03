@@ -1,5 +1,4 @@
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject
-from ..utils import PfTestExecutorQt
 from ..pf_threads import PfBagThread, PfCachedThread, PfTestExecutorQt
         
     
@@ -84,6 +83,7 @@ class PfRecordedDataMode(QObject):
                                      only_single_image=single_image,
                                      added_delay=self.main_app_manager.image_delay_slider.get_delay_ms()/1000,
                                      image_fps=self.main_app_manager.parameters_data.image_fps,
+                                     use_visual_odom=self.main_app_manager.parameters_data.use_visual_odom,
                                      cache_data_enabled=self.main_app_manager.cached_data_creator.cache_data_enabled)
         
         self.pf_thread.load_next_data_file.connect(self.main_app_manager.data_file_controls.load_next_data_file)
@@ -259,7 +259,9 @@ class PfModeCached(PfRecordedDataMode):
                                      stop_when_converged=self.main_app_manager.parameters_pf.stop_when_converged,
                                      only_single_image=single_image,
                                      added_delay=self.main_app_manager.image_delay_slider.get_delay_ms()/1000,
-                                     cache_data_enabled=False)
+                                     cache_data_enabled=False,
+                                     use_visual_odom=self.main_app_manager.parameters_data.use_visual_odom,
+                                     image_fps=self.main_app_manager.parameters_data.image_fps)
         
         # self.pf_thread.load_next_data_file.connect(self.main_app_manager.data_file_controls.load_next_data_file)
         self.pf_thread.pf_run_message.connect(self.main_app_manager.print_message)

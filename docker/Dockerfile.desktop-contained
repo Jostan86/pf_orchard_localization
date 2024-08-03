@@ -1,7 +1,4 @@
-FROM pf-app-image:l4t-r36.3.0
-# pf-app-image is an image built using the jetson-containers tool made by dustynv: https://github.com/dusty-nv/jetson-containers
-# The image is built with the following command:
-# jetson-containers build --name=pf-app-image pytorch tensorflow2 onnxruntime ros:humble-desktop
+FROM osrf/ros:humble-desktop-full
 
 # Add vscode user with same UID and GID as your host system
 # (copied from https://code.visualstudio.com/remote/advancedcontainers/add-nonroot-user#_creating-a-nonroot-user)
@@ -29,12 +26,13 @@ RUN sudo usermod --append --groups video $USERNAME
 
 # Install needed packages
 RUN sudo apt-get update && \
-    sudo apt-get install -y --no-install-recommends \
+    sudo apt-get install -y --no-install-recommends\
     git \
     python3-pyqt5 \
     python3-pip \
-    libgl1-mesa-glx && \
-    sudo apt-get clean && \
+    libxcb-cursor0 && \
+    # # libboost-python-dev \
+    # # libgl1-mesa-glx \
     sudo rm -rf /var/lib/apt/lists/*
 
 RUN pip install \
@@ -49,13 +47,19 @@ RUN pip install \
 # Newest numpy version causes issues with some packages
 RUN pip install numpy==1.26.4
 
+# Update all packages
+RUN sudo apt update && sudo apt upgrade -y
+
+# Rosdep update
+RUN rosdep update
+
 # Create a directory for external repositories
 RUN mkdir -p ~/my_python_packages
-
 # Install map_data_tools, add version so that cache is invalidated when the version changes
 ADD https://api.github.com/repos/Jostan86/map_data_tools/git/refs/heads/main /home/vscode/.map_data_tools_version.json
 RUN git clone https://github.com/Jostan86/map_data_tools.git ~/my_python_packages/map_data_tools
 RUN pip install ~/my_python_packages/map_data_tools
+
 
 # Set up environment variables
 ENV ROS_WS_ROOT=/home/${USERNAME}/ros2_ws
@@ -69,22 +73,67 @@ ADD https://api.github.com/repos/Jostan86/pf_orchard_interfaces/git/refs/heads/m
 RUN cd ${ROS_WS_ROOT}/src && git clone https://github.com/Jostan86/pf_orchard_interfaces.git
 
 # Build the workspace
-RUN cd ${ROS_WS_ROOT} && . /opt/ros/${ROS_DISTRO}/install/setup.sh && colcon build
+RUN cd ${ROS_WS_ROOT} && . /opt/ros/${ROS_DISTRO}/setup.sh && colcon build
+# RUN cd ${ROS_WS_ROOT} && colcon build
 
 # Copy the entrypoint script with the correct permissions
 COPY docker/ros_entrypoint_jetson.sh /
 RUN sudo chmod +x /ros_entrypoint_jetson.sh
-ENTRYPOINT ["/ros_entrypoint_jetson.sh"]
+ENTRYPOINT ["/ros_entrypoint_desktop.sh"]
 
 RUN mkdir -p ~/tmp/runtime-${USERNAME}
 RUN chmod -R 700 ~/tmp/runtime-${USERNAME}
 
 # Add the ROS setup to the bashrc
-RUN echo "source /opt/ros/${ROS_DISTRO}/install/setup.bash" >> ~/.bashrc
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 RUN echo "source ${ROS_WS_ROOT}/install/setup.bash" >> ~/.bashrc
 
+
+
+### ------------------- ###
+# Stuff added for 'contained' version
+### ------------------- ###
+# Install trunk width estimation package, add version so that cache is invalidated when the version changes
+ADD https://api.github.com/repos/Jostan86/trunk_width_estimation/git/refs/heads/main /home/vscode/.trunk_width_estimation_version.json
+RUN git clone https://github.com/Jostan86/trunk_width_estimation.git ~/my_python_packages/trunk_width_estimation
+RUN pip install ~/my_python_packages/trunk_width_estimation
+
+RUN sudo apt-get update \
+    && sudo apt-get install -y \
+    # python3-opencv \
+    libgl1 \
+    libglib2.0-0 \
+    libxrender1 \
+    libsm6 \
+    libxext6 \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+RUN sudo apt-get update && \
+    pip install \
+    ultralytics \
+    pydantic \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+RUN sudo apt-get update && \
+    sudo apt-get install -y \
+    python3-opencv \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+# Remove the default opencv-python package, i need only the headless version
+RUN pip uninstall opencv-python -y
+
+# Newest numpy version causes issues with some packages
+RUN pip install numpy==1.26.4
+
+# Update all packages
+RUN sudo apt update && sudo apt upgrade -y && sudo rm -rf /var/lib/apt/lists/*
+
+RUN echo "export WIDTH_ESTIMATION_PACKAGE_PATH=/home/vscode/my_python_packages/trunk_width_estimation" >> ~/.bashrc
+### ------------------- ###
+### ------------------- ###
+
 # These (should / should help to) force the gui applications to show up only on the remote display window
-ENV DISPLAY=:0
+ENV DISPLAY=:1
 ENV REMOTE_CONTAINERS_DISPLAY_SOCK=/tmp/.X11-unix/X0
 
 # Set to remove a warning from pyqt
@@ -94,5 +143,8 @@ ENV XDG_RUNTIME_DIR=/tmp/runtime-${USERNAME}
 ENV WORKSPACE_ROOT=/home/${USERNAME}/pf_orchard_localization
 COPY --chown=${USERNAME}:${USERNAME} . ${WORKSPACE_ROOT}
 RUN pip install -e ${WORKSPACE_ROOT}
+
+
+
 
 USER root

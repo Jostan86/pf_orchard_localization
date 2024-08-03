@@ -1,0 +1,23 @@
+{
+  "name": "particle_filter_localization_desktop",
+  "dockerComposeFile": [
+    "../../docker/docker-compose-desktop-contained-pf-app.yml" 
+    // "../../docker/docker-compose-desktop-ros-pf-app.yml" 
+  ],
+  "service": "pf_orchard_localization",
+  "workspaceFolder": "/home/vscode/pf_orchard_localization",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/vscode/.bash_history,type=bind"
+  ],
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-containers"
+      ]
+    }
+  },
+  "overrideCommand": true
+}

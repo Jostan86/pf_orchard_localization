@@ -30,6 +30,7 @@ class PfBagThread(QThread):
                  only_single_image, 
                  added_delay, 
                  image_fps,
+                 use_visual_odom=False,
                  cache_data_enabled=False):
         """
         Args:
@@ -40,6 +41,7 @@ class PfBagThread(QThread):
             only_single_image (bool): If True, the thread will only process a single image then exit
             added_delay (float): The amount of added time to wait between processing images
             image_fps (int): The frames per second of the images
+            use_visual_odom (bool, optional): If True, the thread will use visual odometry. Defaults to False.
             cache_data_enabled (bool, optional): If True, the thread will cache the data. Defaults to False.
         """
         
@@ -52,6 +54,7 @@ class PfBagThread(QThread):
         self.stop_when_converged = stop_when_converged
         self.only_single_image = only_single_image
         self.added_delay = added_delay
+        self.use_visual_odom = use_visual_odom
 
         self.fps = image_fps
         
@@ -61,16 +64,16 @@ class PfBagThread(QThread):
         
         self.trunk_data = None
         
-        self.visual_odom_thread = OpticalFlowOdometerThread()
-        self.visual_odom_thread.start()
-        self.visual_odom_thread.signal_request_processed.connect(self.on_visual_odom_request_processed)
+        if self.use_visual_odom:
+            self.visual_odom_thread = OpticalFlowOdometerThread()
+            self.visual_odom_thread.start()
+            self.visual_odom_thread.signal_request_processed.connect(self.on_visual_odom_request_processed)
+            self.odom_mutex = QMutex()
+            self.odom_condition = QWaitCondition()
         
         self.trunk_mutex = QMutex()
         self.trunk_condition = QWaitCondition()
         
-        self.odom_mutex = QMutex()
-        self.odom_condition = QWaitCondition()
-
         self.data_manager_mutex = QMutex()
         self.data_manager_condition = QWaitCondition()
         
@@ -141,11 +144,10 @@ class PfBagThread(QThread):
         self.set_time_line.emit(self.data_manager.current_data_file_time_stamp)
 
         # Using visual odom so this is commented out, TODO: make visual odom a setting somewhere, also, cacheing for visual odom currently doesn't work
-        if current_msg['topic'] == 'odom':
-            # x_odom, theta_odom, time_stamp_odom = self.get_odom_data(current_msg)
-            # self.pf_engine.handle_odom(x_odom, theta_odom, time_stamp_odom)
-            pass
-
+        if current_msg['topic'] == 'odom' and not self.use_visual_odom:
+            x_odom, theta_odom, time_stamp_odom = self.get_wheel_odom_data(current_msg)
+            self.pf_engine.handle_odom(x_odom, theta_odom, time_stamp_odom)
+            
         elif current_msg['topic'] == 'image':
             
             self.get_data_from_image_msg(current_msg)
@@ -160,21 +162,25 @@ class PfBagThread(QThread):
         
         # Send off the request for processing the trunk data and odom data then wait for the response
         request = {"current_msg": current_msg}
+
         self.trunk_data_thread.handle_request(request)
-        self.visual_odom_thread.handle_request(request)
+        
+        if self.use_visual_odom:
+            self.visual_odom_thread.handle_request(request)
         
         self.trunk_data = None
         self.x_odom = None
         
         self.wait_for_response()
         
-        # If the odom data is None, the visual odometer failed to process the image
-        if self.x_odom != "returned_none":
-            u = np.array([[self.x_odom/self.dt], [0]])
-            num_readings = int(self.dt * 60)
-            self.pf_engine.motion_update(u, self.dt, num_readings=num_readings)
-        else:
-            return
+        if self.use_visual_odom:
+            # If the odom data is None, the visual odometer failed to process the image
+            if self.x_odom != "returned_none":
+                u = np.array([[self.x_odom/self.dt], [0]])
+                num_readings = int(self.dt * 60)
+                self.pf_engine.motion_update(u, self.dt, num_readings=num_readings)
+            else:
+                return
         
 
         positions, widths, class_estimates, seg_img = self.trunk_data
@@ -211,11 +217,12 @@ class PfBagThread(QThread):
             self.trunk_condition.wait(self.trunk_mutex)
         self.trunk_mutex.unlock()
         
-        # Trunk data is in, now wait for odom data if it is not already in
-        self.odom_mutex.lock()
-        if self.x_odom is None:
-            self.odom_condition.wait(self.odom_mutex)
-        self.odom_mutex.unlock()
+        if self.use_visual_odom:
+            # Trunk data is in, now wait for odom data if it is not already in
+            self.odom_mutex.lock()
+            if self.x_odom is None:
+                self.odom_condition.wait(self.odom_mutex)
+            self.odom_mutex.unlock()
         
     
     @pyqtSlot(object)
@@ -247,7 +254,7 @@ class PfBagThread(QThread):
         self.odom_condition.wakeAll()
         self.odom_mutex.unlock()
         
-    def get_odom_data(self, current_msg):
+    def get_wheel_odom_data(self, current_msg):
         """
         Get the odometry data from the current message
 
@@ -288,15 +295,13 @@ class PfCachedThread(PfBagThread):
     """
     Thread to run the particle filter algorithm using cached data, extending PfBagThread
     """
-    # TODO update this class with visual odom in mind
-
     def get_new_data_manager(self):
         """
         Override the base class method to just exit if the end of a data file is reached, as cached data does not have multiple files
         """
         self.pf_active = False       
     
-    def get_odom_data(self, current_msg):
+    def get_wheel_odom_data(self, current_msg):
         """
         Override the base class method to get the odometry data from the cached data manager
 
@@ -324,7 +329,9 @@ class PfCachedThread(PfBagThread):
         request = {"current_msg": current_msg}
         
         self.trunk_data_thread.handle_request(request)
-        self.visual_odom_thread.handle_request(request)
+
+        if self.use_visual_odom:
+            self.visual_odom_thread.handle_request(request)
         
         self.trunk_data = None
         

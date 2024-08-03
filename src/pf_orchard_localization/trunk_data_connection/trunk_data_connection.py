@@ -12,6 +12,7 @@ import copy
 # Function to only import these if they're needed
 def import_trunk_analyzer(width_estimation_config_file_path):
     from trunk_width_estimation import TrunkAnalyzer, TrunkSegmenter, PackagePaths
+    # TODO: make the config file path an argument that works
     config_file = "width_estimation_config_apple.yaml"
     return TrunkAnalyzer(PackagePaths(config_file), combine_segmenter=False), TrunkSegmenter(PackagePaths(config_file))
 
@@ -38,6 +39,11 @@ class TrunkDataConnection(QThread):
             class_mapping (tuple, optional): The mapping of classes for the trunk data. Defaults to (1, 2, 0).
             offset (tuple, optional): The offset to apply to the positions. Defaults to (0, 0).
         """
+        super().__init__()
+
+        self.wait_condition = QWaitCondition()
+        self.mutex = QMutex()
+
         self.init_trunk_analyzer(width_estimation_config_file_path)
 
         self.class_mapping = class_mapping
@@ -57,12 +63,7 @@ class TrunkDataConnection(QThread):
         self.x_positions_in_image = None
         self.results_kept = None
         
-        self.current_msg = None
-        
-        self.wait_condition = QWaitCondition()
-        self.mutex = QMutex()
-        
-        super().__init__()
+        self.current_msg = None        
 
     def init_trunk_analyzer(self, width_estimation_config_file_path):
         """
@@ -70,8 +71,9 @@ class TrunkDataConnection(QThread):
         
         Args:
             width_estimation_config_file_path (str): The path to the width estimation config file"""
-        if width_estimation_config_file_path is not None:
-            self.trunk_analyzer, self.trunk_segmenter = import_trunk_analyzer(width_estimation_config_file_path)
+        self.mutex.lock()
+        self.trunk_analyzer, self.trunk_segmenter = import_trunk_analyzer(width_estimation_config_file_path)
+        self.mutex.unlock()
 
     def run(self):
         """
@@ -271,6 +273,12 @@ class TrunkDataConnectionCachedData(TrunkDataConnection):
         super().__init__(class_mapping=class_mapping, offset=offset)
 
         self.cached_img_directory = cached_img_directory
+    
+    def init_trunk_analyzer(self, width_estimation_config_file_path):
+        """
+        Bypass the init_trunk_analyzer method because the trunk analyzer and segmenter are not needed
+        """
+        pass
     
     def get_trunk_data(self, current_msg, return_seg_img=False):
         """

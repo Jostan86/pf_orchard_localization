@@ -12,13 +12,21 @@ from ..utils.parameters import ParametersPf, ParametersBagData, ParametersCached
 from ..pf_engine import PfEngine
 from map_data_tools import MapData
 import logging
-from ..trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCachedData, TrunkDataConnectionRosService, TrunkDataConnectionRosSub
+# from ..trunk_data_connection import TrunkDataConnection, TrunkDataConnectionCachedData, TrunkDataConnectionRosService, TrunkDataConnectionRosSub
 from ..app_modes import PfRecordedDataMode, PfModeCached, PfModeCachedTests, PlaybackMode, PfLiveMode, PfModeSaveCalibrationData
 import os
 from functools import partial
 import time
 import copy
 
+# Function to only import these if they're needed
+def import_trunk_data_connection(parameters_data):
+    if parameters_data.use_ros_service_for_trunk_width:
+        from ..trunk_data_connection import TrunkDataConnectionRosService
+        return TrunkDataConnectionRosService()
+    else:
+        from ..trunk_data_connection import TrunkDataConnection
+        return TrunkDataConnection()
 
 class PfAppBase(PfMainWindow):
     """
@@ -386,7 +394,7 @@ class PfAppBags(PfAppBase):
         """
         Setup the object that connects the app to the trunk segmenter and analyzer
         """
-        self.trunk_data_connection = TrunkDataConnectionRosService()
+        self.trunk_data_connection = import_trunk_data_connection(self.parameters_data)
         self.trunk_data_connection.start()
         self.image_display_checkbox_changed()
         
@@ -487,6 +495,8 @@ class PfAppCached(PfAppBase):
         """
         Setup the object that connects the app to the trunk segmenter and analyzer
         """
+        # TODO fix this
+        from ..trunk_data_connection import TrunkDataConnectionCachedData
         self.trunk_data_connection = TrunkDataConnectionCachedData(self.parameters_data.cached_image_dir)
         
         self.trunk_data_connection.start()

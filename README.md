@@ -1,5 +1,5 @@
 # Orchard Localization Using a Particle Filter
-This package provides the source code for the particle filter localization system discussed in our paper, "Tree Detection and In-Row Localization for Autonomous Precision Orchard Management." The paper is currently under review, but you can view a pre-print [here](https://1drv.ms/b/s!AhPJ6XcTEu5umd0A4t0iqxyoTPey4A?e=BG1mKW).
+This package provides the source code for the particle filter localization system discussed in our paper, "Tree Detection and In-Row Localization for Autonomous Precision Orchard Management." The paper is currently under review, but a pre-print is available [here](https://1drv.ms/b/s!AhPJ6XcTEu5umd0A4t0iqxyoTPey4A?e=BG1mKW). Additionally, this short [demo video](https://www.youtube.com/watch?v=VH3EroQQkak) describes a module we built using an Nvidia Jetson that uses this code to localize in an orchard.
 
 ## Table of Contents
 1. [Introduction](#introduction)

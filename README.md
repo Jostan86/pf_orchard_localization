@@ -95,7 +95,7 @@ Some sample data is available [here](https://1drv.ms/f/s!AhPJ6XcTEu5umc8Ljo8Ds4Z
 
 ### Bag data
 
-#### Paths Running in Devcontainer
+#### Paths to set for running in devcontainer
 If using the dev container, change this line in the docker compose file to point to the directory with the downloaded files.
 
 ```/media/jostan/portabits/pf_app_data:/home/vscode/app_data:rw```
@@ -104,7 +104,7 @@ Change to:
 
 ```/path/to/pf_app_data:/home/vscode/app_data:rw```
 
-#### Paths Running Locally
+#### Paths to set for running locally
 If running locally, change the ```map_data_path``` and ```data_file_dir``` parameters in the ```config/parameters_pf_app_bags.yaml``` file to match where those were downloaded to. 
 
 The ```pf_config_file_path``` will also need to be changed to point to it's location at ```config/parameters_pf.yaml``` from root.

@@ -87,7 +87,7 @@ colcon build
 ```
 And don't forget to source the workspace:
 ```bash
-source /your/ros2_ws/install.setup.bash
+source /your/ros2_ws/install/setup.bash
 ```
 
 ## Usage 

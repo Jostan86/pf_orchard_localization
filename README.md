@@ -70,13 +70,13 @@ The [trunk_width_estimation](https://github.com/Jostan86/trunk_width_estimation)
 cd /where/you/want/to/install
 git clone https://github.com/Jostan86/trunk_width_estimation.git
 cd trunk_width_estimation
-pip install -e 
+pip install -e .
 ```
 ```bash
 cd /where/you/want/to/install
 git clone https://github.com/Jostan86/map_data_tools.git
 cd map_data_tools
-pip install -e 
+pip install -e .
 ```
 For sending messages over ROS, the [pf_orchard_interfaces](https://github.com/Jostan86/pf_orchard_interfaces) package will also have to be installed to a ros2 workspace. 
 ```bash

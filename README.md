@@ -42,7 +42,7 @@ To run locally, ROS2 Humble will need to be installed, then a python virtual env
 
 ```bash
 cd /where/you/want/to/install/venv
-python3.10 venv -m trunk_width_venv
+python3.10 -m venv trunk_width_venv
 source /path/to/venv/bin/activate
 ```
 

@@ -1,16 +1,21 @@
+from PyQt5.QtCore import QThread, pyqtSignal, QObject, QMutex, QWaitCondition, pyqtSlot
 import os
-
 import cv2
 import numpy as np
 from scipy.ndimage import median_filter
 import time
-from PyQt5.QtCore import QThread, pyqtSignal, QObject, QMutex, QWaitCondition, pyqtSlot
+
+from pf_orchard_localization.data_managers import data_msgs
+
+import logging
+logger = logging.getLogger(__name__)
 
 class OpticalFlowOdometerThread(QThread):
     signal_request_processed = pyqtSignal(object)
     
     def __init__(self):
         super().__init__()
+        self.image_data_msg = None
         self.wait_condition = QWaitCondition()
         self.mutex = QMutex()
         self.optical_flow_estimator = OpticalFlowOdometer()
@@ -19,16 +24,22 @@ class OpticalFlowOdometerThread(QThread):
         while True:
             self.mutex.lock()
             self.wait_condition.wait(self.mutex)
-            if self.current_msg is not None:
-                result = self.optical_flow_estimator.get_odom_estimate(self.current_msg['rgb_image'], self.current_msg['depth_image'])
-                self.signal_request_processed.emit(result)
+            if self.image_data_msg is not None:
+                logger.debug(f"Calculating visual odom estimate for image with timestamp: {self.image_data_msg.bag_timestamp}")
+                linear_displacement = self.optical_flow_estimator.get_odom_estimate(self.image_data_msg.rgb_image, self.image_data_msg.depth_image)
+                odom_data_msg = data_msgs.Odom.from_visual_odom_data(linear_displacement=linear_displacement,
+                                                                     angular_velocity=0.0,
+                                                                     msg_timestamp=self.image_data_msg.msg_timestamp,
+                                                                     bag_timestamp=self.image_data_msg.bag_timestamp)
+                self.signal_request_processed.emit(odom_data_msg)
                 self.current_msg = None
             self.mutex.unlock()
         
-    @pyqtSlot(dict)
-    def handle_request(self, request_data):
+    @pyqtSlot(data_msgs.Image)
+    def handle_request(self, image_data_msg: data_msgs.Image):
         self.mutex.lock()
-        self.current_msg = request_data["current_msg"]
+        self.image_data_msg = image_data_msg
+        
         
         self.wait_condition.wakeAll()
         self.mutex.unlock()
@@ -108,22 +119,28 @@ class OpticalFlowOdometer:
     def get_movement_estimate(self, rgb_img, depth_img):
         rgb_img = cv2.resize(rgb_img, (int(rgb_img.shape[1] * self.scale), int(rgb_img.shape[0] * self.scale)))
         depth_img = cv2.resize(depth_img, (int(depth_img.shape[1] * self.scale), int(depth_img.shape[0] * self.scale)))
-
-        points_previous_img_3d, points_current_img_2d = self.get_matched_keypoints(rgb_img, depth_img)
         
-        if points_previous_img_3d is None or points_current_img_2d is None:
-            print("Need another image to estimate movement")
+        try:
+            points_previous_img_3d, points_current_img_2d = self.get_matched_keypoints(rgb_img, depth_img)
+            
+            if points_previous_img_3d is None or points_current_img_2d is None:
+                logger.warning("Need another image to estimate movement")
+                return None, None
+
+            # SolvePnP to estimate camera movement
+        
+            _, rotation_vector, translation_vector, inliers = cv2.solvePnPRansac(points_previous_img_3d,
+                                                                                points_current_img_2d,
+                                                                                self.intrinsic_matrix,
+                                                                                None,
+                                                                                iterationsCount=1000,
+                                                                                reprojectionError=4.0,
+                                                                                confidence=0.99,)
+        except Exception as e:
+            print("Error in solvePnPRansac: {}".format(e))
+            self.depth_image_previous = None
             return None, None
-
-        # SolvePnP to estimate camera movement
-        _, rotation_vector, translation_vector, inliers = cv2.solvePnPRansac(points_previous_img_3d,
-                                                                             points_current_img_2d,
-                                                                             self.intrinsic_matrix,
-                                                                             None,
-                                                                             iterationsCount=1000,
-                                                                             reprojectionError=4.0,
-                                                                             confidence=0.99,)
-
+        
         if inliers is None:
             # print("No inliers found")
             return None, None
@@ -135,8 +152,12 @@ class OpticalFlowOdometer:
 
         return translation_vector, rotation_vector
     
-    def get_odom_estimate(self, rgb_img: np.ndarray, depth_img: np.ndarray):
-        translation_vector, rotation_vector = self.get_movement_estimate(rgb_img, depth_img)
+    def get_odom_estimate(self, rgb_img: np.ndarray, depth_img: np.ndarray) -> float:
+        try:            
+            translation_vector, rotation_vector = self.get_movement_estimate(rgb_img, depth_img)
+        except Exception as e:
+            print("Error in get_odom_estimate: {}".format(e))
+            return None
         
         if translation_vector is None:
             return None
@@ -154,25 +175,25 @@ if __name__=="__main__":
     # file_path_img_1 = "/media/jostan/MOAD/research_data/map_making_data/jazz_apple/data_by_row/row_0/rgb/" + img_num_1 + ".png"
     # file_path_img_2 = "/media/jostan/MOAD/research_data/map_making_data/jazz_apple/data_by_row/row_0/rgb/" + img_num_2 + ".png"
     #
-    # # file_path_depth_1 = "/media/jostan/portabits/map_making_data/depth_images/" + img_num_1 + ".png"
-    # # file_path_depth_2 = "/media/jostan/portabits/map_making_data/depth_images/" + img_num_2 + ".png"
+    # # file_path_depth_1 = "/media/jostan/Portabits/map_making_data/depth_images/" + img_num_1 + ".png"
+    # # file_path_depth_2 = "/media/jostan/Portabits/map_making_data/depth_images/" + img_num_2 + ".png"
     # file_path_depth_1 = "/media/jostan/MOAD/research_data/map_making_data/jazz_apple/data_by_row/row_0/depth_aligned/" + img_num_1 + ".png"
     # file_path_depth_2 = "/media/jostan/MOAD/research_data/map_making_data/jazz_apple/data_by_row/row_0/depth_aligned/" + img_num_2 + ".png"
 
     # rgb_dir = "/media/jostan/MOAD/research_data/map_making_data/jazz_apple/data_by_row/row_0/rgb/"
     # depth_dir = "/media/jostan/MOAD/research_data/map_making_data/jazz_apple/data_by_row/row_0/depth_aligned/"
-    # rgb_dir = "/media/jostan/portabits/blueberry_data/horz_scan_4-5-24/extraction_bush_3_west_2_2/color/"
-    # depth_dir = "/media/jostan/portabits/blueberry_data/horz_scan_4-5-24/extraction_bush_3_west_2_2/depth_to_color/"
-    rgb_dir = "/media/jostan/portabits/vo_test/rgb/"
-    depth_dir = "/media/jostan/portabits/vo_test/depth/"
+    # rgb_dir = "/media/jostan/Portabits/blueberry_data/horz_scan_4-5-24/extraction_bush_3_west_2_2/color/"
+    # depth_dir = "/media/jostan/Portabits/blueberry_data/horz_scan_4-5-24/extraction_bush_3_west_2_2/depth_to_color/"
+    rgb_dir = "/media/jostan/Portabits/vo_test/rgb/"
+    depth_dir = "/media/jostan/Portabits/vo_test/depth/"
 
     image_names = os.listdir(rgb_dir)
     image_names.sort()
     depth_names = os.listdir(depth_dir)
     depth_names.sort()
 
-    odom_data = np.load("/media/jostan/portabits/vo_test/odom_data.npy")
-    odom_timestamps = np.load("/media/jostan/portabits/vo_test/odom_timestamps.npy")
+    odom_data = np.load("/media/jostan/Portabits/vo_test/odom_data.npy")
+    odom_timestamps = np.load("/media/jostan/Portabits/vo_test/odom_timestamps.npy")
 
 
     # d435 camera intrinsics
@@ -209,19 +230,19 @@ if __name__=="__main__":
         print("Time to estimate movement: {}".format(time.time() - start_time))
         
         if of_estimate is None:
-            time_stamp_part = image_name.split(".")[0]
-            time_stamp = int(time_stamp_part.split("_")[0]) + int(time_stamp_part.split("_")[1]) / 1e9
+            timestamp_part = image_name.split(".")[0]
+            timestamp = int(timestamp_part.split("_")[0]) + int(timestamp_part.split("_")[1]) / 1e9
             continue
         
         
-        time_stamp_previous = time_stamp
-        time_stamp_part = image_name.split(".")[0]
-        time_stamp = int(time_stamp_part.split("_")[0]) + int(time_stamp_part.split("_")[1]) / 1e9
+        timestamp_previous = timestamp
+        timestamp_part = image_name.split(".")[0]
+        timestamp = int(timestamp_part.split("_")[0]) + int(timestamp_part.split("_")[1]) / 1e9
 
 
-        idx = np.argmin(np.abs(odom_timestamps - time_stamp))
+        idx = np.argmin(np.abs(odom_timestamps - timestamp))
         velocity = odom_data[idx]
-        distance = velocity * (time_stamp - time_stamp_previous) * 1000
+        distance = velocity * (timestamp - timestamp_previous) * 1000
         print("Odom Estimate: {}".format(round(distance, 2)))
 
         # print the translation vector with two decimal places

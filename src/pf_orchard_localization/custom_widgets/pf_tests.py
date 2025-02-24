@@ -4,6 +4,7 @@ import numpy as np
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpinBox, QFileDialog, QMessageBox
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from ..utils.pf_evaluation import PfTestRegimen
+from ..utils.parameters import ParametersCachedData
 
 class PfTestControls(QWidget):
     """
@@ -15,16 +16,16 @@ class PfTestControls(QWidget):
     runSelectedTestClicked = pyqtSignal()
     abortSelectedTestClicked = pyqtSignal()
 
-    def __init__(self, main_app_manager):
+    def __init__(self, parameters_data: ParametersCachedData):
         """
         Extends QWidget to create a widget that allows the user to control the particle filter tests
 
         Args:
-            main_app_manager (PfAppBags or PfAppCached): The main application manager 
+            parameters_data (ParametersCachedData): The parameters for the app
         """
         super().__init__()
 
-        self.main_app_manager = main_app_manager
+        self.parameters_data = parameters_data
 
         self.run_all_button = QPushButton("Run All Tests")
         self.run_all_button.setToolTip("Start the test regimen")
@@ -124,11 +125,9 @@ class PfTestControls(QWidget):
 
 
     def load_pf_test_names(self):
-        """
-        Load the names of the particle filter tests from the test regimen file, which is a csv file with the test data and the 
-        path to it is set in the parameters file.
-        """
-        pf_test_regimen = PfTestRegimen(test_info_file_path=self.main_app_manager.parameters_data.test_start_info_path)
+        """Load the names of the particle filter tests from the test regimen file, which is a csv file with the test data and the 
+        path to it is set in the parameters file."""
+        pf_test_regimen = PfTestRegimen(test_info_file_path=self.parameters_data.test_start_info_path)
         
         if len(pf_test_regimen.pf_tests) == 0:
             raise FileNotFoundError("No tests found in the test regimen file or idk something wack")
@@ -138,10 +137,8 @@ class PfTestControls(QWidget):
 
     @pyqtSlot()
     def run_all_button_clicked(self):
-        """
-        Slot that is called when the run all button is clicked. Emits the runAllTestsClicked signal if the button text is "Run All Tests",
-        or the abortAllTestsClicked signal if the button text is "Abort Tests
-        """
+        """Slot that is called when the run all button is clicked. Emits the runAllTestsClicked signal if the button text is "Run All Tests",
+        or the abortAllTestsClicked signal if the button text is "Abort Tests"""
         if self.run_all_button.text() == "Run All Tests":
             self.runAllTestsClicked.emit()
         elif self.run_all_button.text() == "Abort Tests":
@@ -149,10 +146,8 @@ class PfTestControls(QWidget):
 
     @pyqtSlot()
     def run_selected_button_clicked(self):
-        """
-        Slot that is called when the run selected button is clicked. Emits the runSelectedTestClicked signal if the button text is "Run Selected Test",
-        or the abortSelectedTestClicked signal if the button text is "Abort Test
-        """
+        """Slot that is called when the run selected button is clicked. Emits the runSelectedTestClicked signal if the button text is "Run Selected Test",
+        or the abortSelectedTestClicked signal if the button text is "Abort Test" """
         if self.run_selected_button.text() == "Run Selected Test":
             self.runSelectedTestClicked.emit()
         elif self.run_selected_button.text() == "Abort Test":
@@ -160,8 +155,7 @@ class PfTestControls(QWidget):
 
 
     def set_running_all_tests(self, running_all_tests: bool):
-        """
-        Set the state of the widget to reflect if the tests are currently running or not
+        """Set the state of the widget to reflect if the tests are currently running or not
         
         Args:
             running_all_tests (bool): True if the tests are currently running, False otherwise
@@ -179,8 +173,7 @@ class PfTestControls(QWidget):
 
 
     def set_running_selected_test(self, running_selected_test: bool):
-        """
-        Set the state of the widget to reflect if the selected test is currently running or not
+        """Set the state of the widget to reflect if the selected test is currently running or not
 
         Args:
             running_selected_test (bool): True if the selected test is currently running, False otherwise
@@ -197,22 +190,16 @@ class PfTestControls(QWidget):
         self.test_selection_combobox.setDisabled(running_selected_test)
 
     def get_selected_test(self):
-        """
-        Get the index of the selected test in the test selection combobox
-        """
+        """Get the index of the selected test in the test selection combobox"""
         return self.test_selection_combobox.currentIndex()
 
     def get_num_trials_per_location(self):
-        """
-        Get the number of trials to run at each location
-        """
+        """Get the number of trials to run at each location"""
         return self.tests_per_location_spinbox.value()
 
     @pyqtSlot()
     def load_tests_button_clicked(self):
-        """
-        Slot that is called when the load tests button is clicked. Opens a file dialog to select the test regimen file
-        """
+        """Slot that is called when the load tests button is clicked. Opens a file dialog to select the test regimen file"""
         file_name = QFileDialog.getOpenFileName(self, "Select Test Regimen", filter="*.csv")
         if file_name == "":
             return
@@ -220,9 +207,7 @@ class PfTestControls(QWidget):
             self.load_test(file_name[0])
 
     def set_save_path(self):
-        """
-        Opens a file dialog to select the path to save the test results 
-        """
+        """Opens a file dialog to select the path to save the test results"""
         save_path = QFileDialog.getSaveFileName(self, "Save Results", filter="*.csv")
         if save_path == "":
             return
@@ -249,8 +234,7 @@ class PfTestControls(QWidget):
     
     @pyqtSlot(float, int)
     def update_trial_info(self, trial_time_elapsed, num_particles):
-        """
-        Update the trial information labels with the current trial time elapsed and number of particles
+        """Update the trial information labels with the current trial time elapsed and number of particles
 
         Args:
             trial_time_elapsed (float): The time elapsed since the start of the trial

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDialogButtonBox
 from ..utils.parameters import ParametersPf
 

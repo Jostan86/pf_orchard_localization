@@ -1,7 +1,16 @@
 from PyQt5.QtCore import QTimer, QThread, QObject, pyqtSlot, pyqtSignal
-from PyQt5.QtWidgets import QHBoxLayout
 import os
 import cv2
+from typing import List, Dict, Union, TYPE_CHECKING, Callable
+
+from pf_orchard_localization import data_managers
+from pf_orchard_localization.data_managers import data_msgs
+
+if TYPE_CHECKING:
+    from pf_orchard_localization import app_managers
+
+import logging
+logger = logging.getLogger(__name__)
 
 class PlaybackThread(QThread):
     
@@ -9,15 +18,18 @@ class PlaybackThread(QThread):
     signal_set_time_line = pyqtSignal(float)
     signal_set_img_number_label = pyqtSignal(int, int)
     
-    def __init__(self, data_manager, get_trunk_data_func, only_single_image, forward, added_delay):
-        
-        
+    def __init__(self, 
+                 data_manager: data_managers.AnyDataLoader,
+                 get_trunk_data_func: Callable,
+                 only_single_image: bool,
+                 forward: bool,
+                 time_delay_multiplier: float):       
         
         self.data_manager = data_manager
         self.get_trunk_data_func = get_trunk_data_func
         self.only_single_image = only_single_image
         self.forward = forward
-        self.added_delay = added_delay
+        self.time_delay_multiplier = time_delay_multiplier
         
         self.playing = False
         
@@ -26,8 +38,8 @@ class PlaybackThread(QThread):
     def print_message(self, message):
         self.signal_print_message.emit(message)
     
-    def set_time_line(self, time_stamp):
-        self.signal_set_time_line.emit(time_stamp)
+    def set_time_line(self, timestamp):
+        self.signal_set_time_line.emit(timestamp)
     
     def set_img_number_label(self, current_img_position, num_img_msgs):
         self.signal_set_img_number_label.emit(current_img_position, num_img_msgs)
@@ -44,11 +56,8 @@ class PlaybackThread(QThread):
     def play_forward(self):
         self.playing = True
         
-        while self.playing:
-            self.sleep(self.added_delay)
-            
+        while self.playing:            
             self.next_image()
-            
     
     def previous_image(self):
         current_msg = self.data_manager.get_prev_img_msg()
@@ -58,7 +67,7 @@ class PlaybackThread(QThread):
         current_msg = self.data_manager.get_next_img_msg()
         self.image_change_update(current_msg)
 
-    def image_change_update(self, current_msg):
+    def image_change_update(self, current_msg: data_msgs.Image):
         if current_msg is None:
             self.print_message("Reached the beginning/end of the data file")
             self.playing = False
@@ -66,17 +75,17 @@ class PlaybackThread(QThread):
         
         self.get_trunk_data_func(current_msg)
 
-        self.set_time_line(self.data_manager.current_data_file_time_stamp)
+        self.set_time_line(current_msg.bag_timestamp.to_sec())
         self.set_img_number_label(self.data_manager.current_img_position, self.data_manager.num_img_msgs)
     
     @pyqtSlot()
     def stop_playback(self):
         self.playing = False
     
-class PlaybackMode(QObject):
+class ImagePlayback(QObject):
     signal_stop_thread = pyqtSignal()
     
-    def __init__(self, main_app_manager):
+    def __init__(self, main_app_manager: 'app_managers.AnyManager'):
 
         self.main_app_manager = main_app_manager
 
@@ -90,7 +99,7 @@ class PlaybackMode(QObject):
         
         super().__init__()
 
-    def start_playback_thread(self, only_single_image, forward, added_delay):
+    def start_playback_thread(self, only_single_image, forward, time_delay_multiplier):
         
         if self.main_app_manager.data_file_controls.data_manager is None:
             raise ValueError("No data has been loaded.")
@@ -104,7 +113,7 @@ class PlaybackMode(QObject):
                                               get_trunk_data_func=self.main_app_manager.trunk_data_connection.get_trunk_data,
                                               only_single_image=only_single_image,
                                               forward=forward,
-                                              added_delay=added_delay)
+                                              time_delay_multiplier=time_delay_multiplier)
         
         self.playback_thread.signal_print_message.connect(self.main_app_manager.print_message)
         self.playback_thread.signal_set_time_line.connect(self.main_app_manager.data_file_controls.set_time_line)
@@ -134,7 +143,7 @@ class PlaybackMode(QObject):
         if not self.thread_deleted:
             return
         
-        self.start_playback_thread(only_single_image=False, forward=True, added_delay=0)
+        self.start_playback_thread(only_single_image=False, forward=True, time_delay_multiplier=1)
     
     @pyqtSlot()
     def stop_thread(self):
@@ -145,14 +154,14 @@ class PlaybackMode(QObject):
         if not self.thread_deleted:
             return
         
-        self.start_playback_thread(only_single_image=True, forward=False, added_delay=0)
+        self.start_playback_thread(only_single_image=True, forward=False, time_delay_multiplier=1)
 
     @pyqtSlot()
     def next_button_clicked(self):
         if not self.thread_deleted:
             return
         
-        self.start_playback_thread(only_single_image=True, forward=True, added_delay=0)
+        self.start_playback_thread(only_single_image=True, forward=True, time_delay_multiplier=1)
 
     @pyqtSlot()
     def save_button_clicked(self):
@@ -162,19 +171,15 @@ class PlaybackMode(QObject):
         
         current_msg = self.main_app_manager.data_file_controls.data_manager.current_msg
 
-        if 'rgb_image' not in current_msg:
-            self.main_app_manager.print_message("No image to save")
-            return
-
         save_dir = self.main_app_manager.image_browsing_controls.save_location
         if not os.path.exists(save_dir):
             
             self.main_app_manager.print_message("Invalid save location")
             return
 
-        image_name = str(current_msg['timestamp']) + ".png"
+        image_name = str(current_msg.bag_timestamp) + ".png"
         image_path = os.path.join(save_dir, image_name)
-        cv2.imwrite(image_path, current_msg['rgb_image'])
+        cv2.imwrite(image_path, current_msg.rgb_image)
 
 
     def enable_disable_widgets(self, enable):

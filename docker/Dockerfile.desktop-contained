@@ -60,7 +60,6 @@ ADD https://api.github.com/repos/Jostan86/map_data_tools/git/refs/heads/main /ho
 RUN git clone https://github.com/Jostan86/map_data_tools.git ~/my_python_packages/map_data_tools
 RUN pip install ~/my_python_packages/map_data_tools
 
-
 # Set up environment variables
 ENV ROS_WS_ROOT=/home/${USERNAME}/ros2_ws
 ENV ROS_DISTRO=humble

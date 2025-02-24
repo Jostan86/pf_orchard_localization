@@ -1,11 +1,13 @@
-#!/usr/bin/env python3
-
 import numpy as np
 from scipy.spatial import KDTree
 from scipy.stats import norm
 from scipy.ndimage import label
 from map_data_tools import MapData
+from typing import Union
 
+from pf_orchard_localization.utils import ParametersPf
+# from pf_orchard_localization.recorded_data_loaders import MessageType, Timestamp, ImageData, OdomData, ImuData, Gnss, PoseEstimate
+from pf_orchard_localization.data_managers import data_msgs
 
 class PfEngine:
 
@@ -20,7 +22,9 @@ class PfEngine:
         # Create a KDTree for fast nearest-neighbor lookup of the trees
         self.kd_tree = KDTree(self.map_positions)
 
-    def reset_pf(self, setup_data) -> None:
+        self.best_particle: np.ndarray = None
+
+    def reset_pf(self, setup_data: ParametersPf) -> None:
         """
         Reset the particle filter with the given setup data.
         """
@@ -31,16 +35,38 @@ class PfEngine:
         self.orientation_center = np.deg2rad(setup_data.start_orientation_center)
         self.orientation_range = np.deg2rad(setup_data.start_orientation_range)
         num_particles = setup_data.num_particles
+
         self.R = np.diag([setup_data.r_dist, np.deg2rad(setup_data.r_angle)]) ** 2
+        self.noise_fps = setup_data.noise_fps
+
         self.bearing_sd = setup_data.bearing_sd
         self.range_sd = setup_data.range_sd
         self.width_sd = setup_data.width_sd
+
         self.epsilon = setup_data.epsilon
         self.delta = setup_data.delta
         self.bin_size = setup_data.bin_size
         self.bin_angle = np.deg2rad(setup_data.bin_angle)
+
         self.include_width = setup_data.include_width
+
         self.spawn_in_both_directions = setup_data.spawn_particles_in_both_directions
+
+        self.use_orientation_for_angular_velocity = setup_data.use_orientation_for_angular_velocity
+        self.num_readings_for_angular_velocity = setup_data.num_readings_for_angular_velocity
+        self.use_orientation_for_particle_weights = setup_data.use_orientation_for_particle_weights
+        self.orientation_offset = setup_data.orientation_offset
+        self.print_orientation_offset = setup_data.print_orientation_offset
+        self.orientation_sd = setup_data.orientation_sd
+
+        self.motion_update_max_dt = setup_data.motion_update_max_dt
+
+        self.orientation_prev = None
+        self.orientation_current = None
+        self.orientation_prev_time = None
+
+        self.gyro_readings = np.zeros(self.num_readings_for_angular_velocity)
+        self.gyro_readings_idx = 0
 
         self.particles = self.initialize_particles(num_particles)
         num_particles = self.particles.shape[0]
@@ -60,8 +86,16 @@ class PfEngine:
 
         self.odom_zerod = False
         self.prev_t_odom = None
+        self.prev_dt_odom = None
 
         self.histogram = None
+    
+    def reset_timestamps(self):
+        self.prev_t_odom = None
+        self.odom_zerod = False
+        self.orientation_prev = None
+        self.orientation_current = None
+        self.orientation_prev_time
 
     def initialize_particles(self, num_particles: int):
         """
@@ -109,53 +143,179 @@ class PfEngine:
         distances, idx = self.kd_tree.query(particles[:, 0:2])
 
         # remove particles that are too close to a tree
-        particles = np.delete(particles, np.where(distances < 0.8)[0], axis=0)
+        particles = np.delete(particles, np.where(distances < 0.6)[0], axis=0)
 
         return particles
 
-    def handle_odom(self, x_odom: float, theta_odom: float, time_stamp:float, num_readings: int = 1):
+    # def handle_odom(self, x_odom: float, theta_odom: float, timestamp:float, num_readings: int = 1):
+    #     """
+    #     Handle the odom message. This will be called every time an odom message is received.
+
+    #     Args:
+    #         x_odom (float): The linear velocity of the robot in the forward direction, in meters per second
+    #         theta_odom (float): The angular velocity of the robot, in radians per second
+    #         timestamp (float): The current time stamp of the odom message, in seconds
+    #         num_readings (int): The number of readings that have been received since the last odom message was processed
+    #     """
+
+    #     # If this is the first odom message, zero the time and return
+    #     if not self.odom_zerod:
+    #         self.prev_t_odom = timestamp
+    #         self.odom_zerod = True
+    #         return
+
+    #     # Calculate the time step size
+    #     dt_odom = timestamp - self.prev_t_odom
+
+        
+    #     self.prev_t_odom = timestamp
+
+    #     # Set up the control input
+    #     u = np.array([[x_odom], [theta_odom]])
+
+    #     self.motion_update(u, dt_odom, num_readings)
+
+    def motion_update(self, odom_data: data_msgs.Odom):
         """
-        Handle the odom message. This will be called every time an odom message is received.
+        Propagate the particles forward in time using the motion model.
 
         Args:
-            x_odom (float): The linear velocity of the robot in the forward direction, in meters per second
-            theta_odom (float): The angular velocity of the robot, in radians per second
-            time_stamp (float): The current time stamp of the odom message, in seconds
-            num_readings (int): The number of readings that have been received since the last odom message was processed
+            odom_data (data_msgs.Odom): The odometry data message, either visual or wheel odometry. If it's visual odometry, the linear velocity is expected to 
         """
 
+        timestamp = odom_data.msg_timestamp.to_sec()
+        
         # If this is the first odom message, zero the time and return
         if not self.odom_zerod:
-            self.prev_t_odom = time_stamp
+            self.prev_t_odom = timestamp
             self.odom_zerod = True
             return
-
+        
         # Calculate the time step size
-        dt_odom = time_stamp - self.prev_t_odom
+        dt_odom = timestamp - self.prev_t_odom
+        self.prev_t_odom = timestamp
 
-        self.prev_t_odom = time_stamp
+        if dt_odom > self.motion_update_max_dt:
+            if self.prev_dt_odom is not None:
+                print(f"Large time step detected: {dt_odom}, using previous delta t instead")
+                dt_odom = self.prev_dt_odom
+            else:
+                print(f"Large time step detected and no previous delta t, skipping update")
+                return
+
+        self.prev_dt_odom = dt_odom
+
+        if odom_data.message_type == data_msgs.MsgType.VISUAL_ODOM:
+            linear_velocity = odom_data.linear_displacement / dt_odom
+        else:
+            linear_velocity = odom_data.linear_velocity
+
+        if self.use_orientation_for_angular_velocity:
+            angular_velocity = self.angular_velocity
+        else:
+            angular_velocity = odom_data.angular_velocity
 
         # Set up the control input
-        u = np.array([[x_odom], [theta_odom]])
+        u = np.array([[linear_velocity], [angular_velocity]])
 
-        self.motion_update(u, dt_odom, num_readings)
+        num_particles = self.particles.shape[0]
 
-    def scan_update(self, tree_msg: dict):
+        # This is needed to make the noise independent of the time step size
+        noise_multiplier = 1 / np.sqrt(dt_odom * self.noise_fps)
+
+        # Make array of noise to add to the control/odometry velocities
+        noise = np.random.randn(num_particles, 2) @ (self.R * noise_multiplier)
+
+        # Add noise to control/odometry velocities
+        ud = u + noise.T
+
+        # Update particles based on control/odometry velocities and time step size
+        self.particles.T[2, :] += dt_odom * ud[1, :] * 0.5
+        self.particles.T[0, :] += dt_odom * ud[0, :] * np.cos(self.particles.T[2, :])
+        self.particles.T[1, :] += dt_odom * ud[0, :] * np.sin(self.particles.T[2, :])
+        self.particles.T[2, :] += dt_odom * ud[1, :] * 0.5
+
+        # Wrap angles between -pi and pi
+        self.particles.T[2, :] = self.wrap_angle(self.particles.T[2, :])
+
+        # Update best particle with raw odom velocities
+        self.best_particle[0] += dt_odom * u[0] * np.cos(self.best_particle[2])
+        self.best_particle[1] += dt_odom * u[0] * np.sin(self.best_particle[2])
+        self.best_particle[2] += dt_odom * u[1]
+        self.best_particle[2] = self.wrap_angle(self.best_particle[2])
+
+
+        if self.orientation_current is not None and self.print_orientation_offset:
+            # get the difference between the best particles yaw and the imu reading
+            orientation_delta = self.best_particle[2] - self.orientation_current
+            orientation_delta = self.wrap_angle(orientation_delta)
+            print("Orientation diff: ", orientation_delta)  
+    
+    def orientation_update(self, imu_msg: data_msgs.Imu):
         """
-        Handle the tree message. This will be called every time a tree message is received.
+        Handle the IMU message. This will be called every time an IMU message is received.
+        """
+        if not (self.use_orientation_for_angular_velocity or self.use_orientation_for_particle_weights):
+            return
+
+        self.orientation_current = self.yaw_from_quaternion(imu_msg)
+        
+        self.orientation_current += self.orientation_offset
+        self.orientation_current = self.wrap_angle(self.orientation_current)
+
+        if self.orientation_prev is not None and self.use_orientation_for_angular_velocity:
+            delta_yaw = self.orientation_current - self.orientation_prev
+            delta_yaw = self.wrap_angle(delta_yaw)
+            
+            orientation_current_time = imu_msg.msg_timestamp.to_sec()
+            delta_time = orientation_current_time - self.orientation_prev_time
+
+            # print(f"Delta time: {delta_time}")
+            # print(f"current time: {orientation_current_time}")
+            # print(f"Delta yaw: {delta_yaw}")
+            angular_velocity = delta_yaw / delta_time
+
+            self.gyro_readings[self.gyro_readings_idx] = angular_velocity
+            self.gyro_readings_idx += 1
+            if self.gyro_readings_idx == self.num_readings_for_angular_velocity:
+                self.gyro_readings_idx = 0
+
+        if self.use_orientation_for_angular_velocity:
+            self.orientation_prev = self.orientation_current
+            self.orientation_prev_time = imu_msg.msg_timestamp.to_sec()
+
+    def sensor_update(self, image_data_msg: data_msgs.Image):
+        """
+        Does a sensor update. This will be called every time a tree message is received, updates based on the objects in the message and the
+        orientation from the imu if it is being used.
+
+        Args:
+            tree_msg (dict): The message containing the sensed tree/post positions and widths
         """
 
-        if tree_msg['positions'] is not None:
+        orientation_used_in_weight = False
+        tree_position_used_in_weight = False
 
-            postions_sense = np.array(tree_msg['positions'])
-            widths_sense = np.array(tree_msg['widths'])
+        if self.orientation_current is not None and self.use_orientation_for_particle_weights:
+            orientation_used_in_weight = True
+            orientation_weights = self.particle_weight_update_orientation(self.particles, self.orientation_current)
+
+        if image_data_msg.object_locations is not None:
 
             # Calculate the position of the tree on the map
-            tree_global_coords = self.get_object_global_locations(self.particles, postions_sense)
+            tree_global_coords = self.get_object_global_locations(self.particles, image_data_msg.object_locations)
 
-            # Calculate the weights of the particles
-            self.particle_weights = self.get_particle_weight_localize(self.particles, tree_global_coords, widths_sense, postions_sense)
+            tree_position_weights = self.particle_weight_update_tree(self.particles, tree_global_coords, image_data_msg.object_widths, image_data_msg.object_locations)
+            tree_position_used_in_weight = True
 
+        if orientation_used_in_weight and tree_position_used_in_weight:
+            self.particle_weights = orientation_weights * tree_position_weights
+        elif orientation_used_in_weight:
+            self.particle_weights = orientation_weights
+        elif tree_position_used_in_weight:
+            self.particle_weights = tree_position_weights
+        
+        if orientation_used_in_weight or tree_position_used_in_weight:
             # Normalize weights
             self.particle_weights /= np.sum(self.particle_weights)
 
@@ -164,41 +324,22 @@ class PfEngine:
 
         # Resample the particles
         self.resample_particles()
-        
-    def motion_update(self, u: np.ndarray, dt: float, num_readings: int):
-        """
-        Propagate the particles forward in time using the motion model.
+    
 
-        Args:
-            u (np.ndarray): The control input, consisting of the linear velocity in the forward direction and the angular velocity
-            dt (float): The time step size
-            num_readings (int): The number of readings that have been received since the last odom message was processed
-        """
+    
+    @property
+    def angular_velocity(self):
+        return np.mean(self.gyro_readings)
 
-
-        num_particles = self.particles.shape[0]
-
-        # Make array of noise. Noise is averaged over multiple readings if num_readings > 1
-        noise = np.random.randn(num_particles, 2) @ (self.R / np.sqrt(num_readings))
-
-        # Add noise to control/odometry velocities
-        ud = u + noise.T
-
-        # Update particles based on control/odometry velocities and time step size
-        self.particles.T[2, :] += dt * ud[1, :] * 0.5
-        self.particles.T[0, :] += dt * ud[0, :] * np.cos(self.particles.T[2, :])
-        self.particles.T[1, :] += dt * ud[0, :] * np.sin(self.particles.T[2, :])
-        self.particles.T[2, :] += dt * ud[1, :] * 0.5
-
-        # Wrap angles between -pi and pi
-        self.particles.T[2, :] = (self.particles.T[2, :] + np.pi) % (2 * np.pi) - np.pi
-
-        # Update best particle with raw odom velocities
-        self.best_particle[0] += dt * u[0] * np.cos(self.best_particle[2])
-        self.best_particle[1] += dt * u[0] * np.sin(self.best_particle[2])
-        self.best_particle[2] += dt * u[1]
-        self.best_particle[2] = (self.best_particle[2] + np.pi) % (2 * np.pi) - np.pi
-
+    def yaw_from_quaternion(self, imu_msg: data_msgs.Imu) -> float:
+        x = imu_msg.orientation_x
+        y = imu_msg.orientation_y
+        z = imu_msg.orientation_z
+        w = imu_msg.orientation_w
+        t3 = +2.0 * (w * z + x * y)
+        t4 = +1.0 - 2.0 * (y * y + z * z)
+        yaw_z = np.arctan2(t3, t4)
+        return yaw_z
 
     def resample_particles(self):
         """
@@ -211,21 +352,37 @@ class PfEngine:
         # Calculate the step size for resampling
         step_size = np.random.uniform(0, 1 / num_particles)
 
-        # Set a starting position for the resampling
-        cur_weight = self.particle_weights[0]
-        idx_w = 0
-
         # Initialize the new particles array
         new_particles = np.zeros((num_particles, 3))
 
-        # TODO: i think this can be a numpy operation
-        # Use the low variance sampling algorithm to resample the particles
-        for idx_m in range(num_particles):
-            U = step_size + idx_m / num_particles
-            while U > cur_weight:
-                idx_w += 1
-                cur_weight += self.particle_weights[idx_w]
-            new_particles[idx_m, :] = self.particles[idx_w, :]
+
+
+        # # Set a starting position for the resampling
+        # cur_weight = self.particle_weights[0]
+        # idx_w = 0
+
+        # # TODO: i think this can be a numpy operation
+        # # Use the low variance sampling algorithm to resample the particles
+        # for idx_m in range(num_particles):
+        #     U = step_size + idx_m / num_particles
+        #     while U > cur_weight:
+        #         idx_w += 1
+        #         cur_weight += self.particle_weights[idx_w]
+        #     new_particles[idx_m, :] = self.particles[idx_w, :]
+
+        # Cumulative sum of weights
+        cumulative_weights = np.cumsum(self.particle_weights)
+
+        # Generate U values
+        U = step_size + np.arange(num_particles) / num_particles
+
+        # Find indices using searchsorted
+        indices = np.searchsorted(cumulative_weights, U, side='right')
+
+        # Assign new particles
+        new_particles = self.particles[indices]
+
+
 
         self.particles = new_particles
 
@@ -285,7 +442,7 @@ class PfEngine:
 
         return polar_coords
     
-    def get_particle_weight_localize(self, particle_states: np.ndarray, sensed_tree_coords: np.ndarray, widths_sensed: np.ndarray, positions_sensed: np.ndarray) -> np.ndarray:
+    def particle_weight_update_tree(self, particle_states: np.ndarray, sensed_tree_coords: np.ndarray, widths_sensed: np.ndarray, positions_sensed: np.ndarray) -> np.ndarray:
         """
         Calculate the weights of the particles based on the sensed tree locations and widths.
 
@@ -319,9 +476,6 @@ class PfEngine:
             bearing_diff = np.abs(np.arctan2(np.sin(object_relative_particles_rb[:, 1] - seen_object_rb[:, 1]),
                                              np.cos(object_relative_particles_rb[:, 1] - seen_object_rb[:, 1])))
 
-            # for j in range(5):
-            #     print("range diff: ", range_diff[j], "bearing diff: ", bearing_diff[j])
-
             # Calculate the probability of the sensed tree being at the map tree location
             prob_range = self.probability_of_values(range_diff, self.range_sd)
             prob_bearing = self.probability_of_values(bearing_diff, self.bearing_sd)
@@ -338,6 +492,38 @@ class PfEngine:
                 scores *= prob_width
 
         return scores
+    
+    def particle_weight_update_orientation(self, particle_states: np.ndarray, orientation_sensed: np.ndarray) -> np.ndarray:
+        """
+        Calculate the weights of the particles based on the sensed orientation.
+
+        Args:
+            particle_states (np.ndarray): An array of shape (n, 3) containing the states of the particles
+            orientation_sensed (np.ndarray): An array of shape (m, n) containing the sensed orientations for each particle.
+        
+        Returns:
+            np.ndarray: An array of shape (n,) containing the weights of the particles.
+        """
+
+        # Calculate the difference between the sensed orientation and the particle orientation
+        orientation_diffs = np.abs(orientation_sensed - particle_states[:, 2])
+
+        # Calculate the probability of the sensed orientation being the particle orientation
+        prob_orientation = self.probability_of_values(orientation_diffs, self.orientation_sd)
+
+        return prob_orientation
+    
+    def wrap_angle(self, angle: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        """
+        Wrap an angle to be between -pi and pi.
+
+        Args:
+            angle (float): The angle to wrap
+
+        Returns:
+            float: The wrapped angle
+        """
+        return (angle + np.pi) % (2 * np.pi) - np.pi
 
     def probability_of_values(self, measurement_discrepancy: np.ndarray, std_dev: float) -> np.ndarray:
         """

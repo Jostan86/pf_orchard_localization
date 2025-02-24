@@ -1,8 +1,16 @@
 from PyQt5.QtWidgets import QWidget, QComboBox, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QLineEdit
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 import os
+from typing import List, Dict, Union, TYPE_CHECKING, Callable
+
+from pf_orchard_localization import data_managers
+from pf_orchard_localization.utils.parameters import ParametersBagData, ParametersCachedData
+
+if TYPE_CHECKING:
+    ...
+
 import logging
-from ..recorded_data_loaders import Bag2DataLoader, CachedDataLoader
+logger = logging.getLogger(__name__)
 
 class DataFileControls(QWidget):
     """
@@ -12,10 +20,11 @@ class DataFileControls(QWidget):
     data_file_controls_message = pyqtSignal(str)
     data_file_loaded = pyqtSignal(bool, object)
     set_img_number_label = pyqtSignal(int, int)
-    set_image_display = pyqtSignal(dict)
     reset_pf = pyqtSignal(bool)
 
-    def __init__(self, data_parameters, using_cached_data=False):
+    def __init__(self, 
+                 data_parameters: Union[ParametersBagData, ParametersCachedData],
+                 using_cached_data: bool = False):
         """
         Initialize the data file controls widget
 
@@ -25,9 +34,11 @@ class DataFileControls(QWidget):
         """
         super().__init__()
 
-        self.data_manager = None
+        self.data_manager: data_managers.AnyDataLoader = None
         self.using_cached_data = using_cached_data
         self.data_parameters = data_parameters
+
+        self.trunk_data_request_func: Callable = None
 
         if hasattr(data_parameters, 'initial_file_index'):
             self.initial_file_index = data_parameters.initial_bag_index
@@ -80,15 +91,15 @@ class DataFileControls(QWidget):
         self.set_data_file_names()
     
     @pyqtSlot(float)
-    def set_time_line(self, time_stamp: float):
+    def set_time_line(self, timestamp: float):
         """
         Slot to set the time line edit box to a given time stamp
 
         Args:
-            time_stamp (float): The time stamp to set the time line to
+            timestamp (float): The time stamp to set the time line to
         """
-        time_stamp = round(time_stamp, 2)
-        self.data_file_time_line.setText(str(time_stamp))
+        timestamp = round(timestamp, 2)
+        self.data_file_time_line.setText(str(timestamp))
     
     @pyqtSlot()
     def trigger_open_data_file(self):
@@ -103,7 +114,6 @@ class DataFileControls(QWidget):
         Slot to trigger the opening of the next data file in the list from the open next button
         """
         self.load_next_data_file(True)
-
     
     def get_next_data_file_name(self):
         """
@@ -159,25 +169,27 @@ class DataFileControls(QWidget):
         """
         Change the time the data file is at based on a time entered in the time line edit box by the user
         """
-        time_stamp = self.data_file_time_line.text()
+        timestamp = self.data_file_time_line.text()
 
         # Check if the value entered is a number
         try:
-            time_stamp = float(time_stamp)
+            timestamp = float(timestamp)
         except ValueError:
             self.data_file_controls_message.emit("Invalid time stamp")
             return
 
         # Set the time stamp in the data manager and get the current message
-        message, current_msg = self.data_manager.set_time_stamp(time_stamp)
+        set_successfully = self.data_manager.set_file_time_relative_to_start(timestamp)
 
-        self.data_file_controls_message.emit(message)
+        if not set_successfully:
+            return
+        
+        current_msg = self.data_manager.current_msg
+        self.data_file_controls_message.emit("Set time to: " + str(self.data_manager.get_time_relative_to_start()))
 
-        # Update the app with the message from the new time stamp and set the time line to match the exact time stamp of the message
-        if current_msg is not None:
-            self.set_image_display.emit({"current_msg": current_msg, "for_display_only": True})
+        self.trunk_data_request_func(current_msg)
             
-            self.set_time_line(self.data_manager.current_data_file_time_stamp)
+        self.set_time_line(self.data_manager.get_time_relative_to_start())
         
         self.reset_pf.emit(True)
 
@@ -204,7 +216,7 @@ class DataFileControls(QWidget):
 
         self.open_data_file(next_data_file_name, load_first_image)
         
-    def open_data_file(self, data_file_name: str = None, load_first_image: bool = True):
+    def open_data_file(self, data_file_name: str = None, load_first_image: bool = True, data_file_number: int = None):
         """
         Open a data file using a data manager object
 
@@ -212,9 +224,14 @@ class DataFileControls(QWidget):
             data_file_name (str): Name of the data file to open
             load_first_image (bool): Whether to load the first image in the data file
         """
+        #TODO: It might make sense to have a progress bar pop up for this, especially since i freeze the whole program anyway
+
         # If no data file name is given, use the current data file selection
         if data_file_name is None:
             data_file_name = self.current_data_file_selection
+        
+        if data_file_number is not None:
+            data_file_name = self.data_file_names[data_file_number - 1]
 
         self.set_opening()
 
@@ -227,25 +244,29 @@ class DataFileControls(QWidget):
             return
         
         if data_file_path.endswith(".json"):
-            self.data_manager = CachedDataLoader(data_file_path)
+            self.data_manager = data_managers.Cached(data_file_path, self.data_parameters)
         else:
-            self.data_manager = Bag2DataLoader(data_file_path, self.data_parameters.depth_topic, self.data_parameters.rgb_topic, self.data_parameters.odom_topic)
+            self.data_manager = data_managers.Ros2Bag(data_file_path, self.data_parameters)
 
         if self.data_manager.num_img_msgs == 0:
             self.dispense_data_manager(success=False, message="No images found in data file, check topic names")
             return
 
-        self.set_time_line(self.data_manager.current_data_file_time_stamp)
+        self.set_time_line(self.data_manager.get_time_relative_to_start())
 
         msg = ["Opened bag file: " + data_file_name,]
-        msg.append("Number of Odom messages: " + str(self.data_manager.num_odom_msgs))
+        msg.append("Number of visual odom messages: " + str(self.data_manager.num_visual_odom_msgs))
+        msg.append("Number of wheel odom messages: " + str(self.data_manager.num_wheel_odom_msgs))
         msg.append("Number of images: " + str(self.data_manager.num_img_msgs))
+        msg.append("Number of IMU messages: " + str(self.data_manager.num_imu_msgs))
+        msg.append("Number of Corrected GNSS messages: " + str(self.data_manager.num_gnss_corrected_msgs))
+        msg.append("Number of Uncorrected GNSS messages: " + str(self.data_manager.num_gnss_uncorrected_msgs))
 
         self.dispense_data_manager(success=True, message="\n".join(msg))
 
         if load_first_image:
             current_msg = self.data_manager.get_next_img_msg()
-            self.set_image_display.emit({"current_msg": current_msg, "for_display_only": True})
+            self.trunk_data_request_func(current_msg)
             self.set_img_number_label.emit(self.data_manager.current_img_position, self.data_manager.num_img_msgs)
             
     
@@ -313,3 +334,12 @@ class DataFileControls(QWidget):
         self.data_file_open_next_button.setText("Open Next")
         if set_to_current:
             self.set_combo_box_to_current()
+    
+    def set_trunk_data_request_func(self, func: Callable):
+        """
+        Set the function to call when requesting trunk data
+
+        Args:
+            func (Callable): The function to call
+        """
+        self.trunk_data_request_func = func

@@ -7,7 +7,7 @@ services:
       dockerfile: docker/Dockerfile.desktop-contained
     volumes:
       - ../:/home/vscode/pf_orchard_localization:rw
-      - /media/jostan/portabits/pf_app_data:/home/vscode/app_data:rw
+      - /media/jostan/Portabits/pf_app_data:/home/vscode/app_data:rw
     network_mode: "host"
     runtime: nvidia   
     ipc: "host"

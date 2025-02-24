@@ -1,31 +1,59 @@
 # ----------------------
 # General parameters
 # ----------------------
-image_save_dir: /home/vscode/app_data/image_save_dir
+
 initial_data_time: 0  # seconds into the bag file
-initial_data_file_index: 0  # index of the bag file
+initial_data_file_index: 55  # index of the bag file
 
 image_display_scale: 1.0
 
+# The number of images to skip when loading the images from the file. (only used when loading images from the bag file)
+every_nth_image: 3  # 1 means all images in the bag file, 2 means every other image, etc.
+
+# Set to true to use a ros service to get the trunk width instead of loading the trunk width estimation module
+use_ros_service_for_trunk_width: False
+
+# Set to true to use the visual odometry to get the robot's velocity instead of the odometry topic
+# If false, an odom topic must exist
+use_visual_odom: False
 
 # ----------------------
 # Jazz apple orchard
 # ----------------------
-pf_config_file_path: /home/vscode/pf_orchard_localization/config/parameters_pf.yaml
+rgb_topic: /camera/camera/color/image_raw
+depth_topic: /camera/camera/aligned_depth_to_color/image_raw
+odom_topic: /a200_0398/platform/odom/filtered
+orientation_topic: /imu/data
+gnss_uncorrected_topic: /ublox_gps_uncorrected/fix
+gnss_corrected_topic: /ublox_gps_corrected/fix
 
-map_data_path: /home/vscode/app_data/map_data_jazz_new.json
+## Docker ##
+# pf_config_file_path: /home/vscode/pf_orchard_localization/config/parameters_pf.yaml
+# map_data_path: /home/vscode/app_data/map_data_jazz_new.json
+# data_file_dir: /home/vscode/app_data/bag_data_feb_2023/
 
-data_file_dir: /home/vscode/app_data/bag_data_feb_2023/
+## Local ##
+pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
+map_data_path: /media/jostan/Portabits/pf_app_data/map_data_jazz_new.json
+data_file_dir: /media/jostan/Portabits/localization_bag_data-2024-10-22/
 
-rgb_topic: /registered/rgb/image
-depth_topic: /registered/depth/image
 
-odom_topic: /odometry/filtered
+# ----------------------
+# Jazz apple orchard - Feb. 2023
+# ----------------------
+# rgb_topic: /registered/rgb/image
+# depth_topic: /registered/depth/image
+# odom_topic: /odometry/filtered
 
-image_fps: 10
+## Docker ##
+# pf_config_file_path: /home/vscode/pf_orchard_localization/config/parameters_pf.yaml
+# map_data_path: /home/vscode/app_data/map_data_jazz_new.json
+# data_file_dir: /home/vscode/app_data/bag_data_feb_2023/
 
-use_ros_service_for_trunk_width: True
-use_visual_odom: False
+## Local ##
+# pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
+# map_data_path: /media/jostan/Portabits/pf_app_data/map_data_jazz_new.json
+# data_file_dir: /media/jostan/Portabits/pf_app_data/bag_data_feb_2023/
 
 
 # ----------------------
@@ -33,7 +61,7 @@ use_visual_odom: False
 # ----------------------
 # width_estimation_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/width_estimation/config/width_estimation_bi-axe_config.yaml
 
-# data_file_dir: /media/jostan/portabits/bags_new/bi-axe_orchard/row_1/
+# data_file_dir: /media/jostan/Portabits/bags_new/bi-axe_orchard/row_1/
 
 # rgb_topic: /camera/color/image_raw
 # depth_topic: /camera/aligned_depth_to_color/image_raw
@@ -45,7 +73,7 @@ use_visual_odom: False
 # ----------------------
 # width_estimation_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/width_estimation/config/width_estimation_cherry_config.yaml
 
-# data_file_dir: /media/jostan/portabits/bags_new/cherry_orchard/row_3/
+# data_file_dir: /media/jostan/Portabits/bags_new/cherry_orchard/row_3/
 
 # rgb_topic: /camera/color/image_raw
 # depth_topic: /camera/aligned_depth_to_color/image_raw

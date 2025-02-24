@@ -1,7 +1,6 @@
-from PyQt5.QtWidgets import (QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QApplication, QLineEdit, QCheckBox,
-                             QPlainTextEdit, QMainWindow, QComboBox, QFileDialog, QInputDialog, QDialog, QSlider,
-                             QListWidget, QMessageBox, QSpinBox)
-from PyQt5.QtGui import QImage, QPixmap, QGuiApplication
+from PyQt5.QtWidgets import (QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLineEdit, QCheckBox,
+                             QPlainTextEdit, QComboBox, QFileDialog, QDialog, QSlider, QSpinBox)
+from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 import math
 import cv2
@@ -12,48 +11,21 @@ import logging
 import json
 import os
 import copy
+from map_data_tools import map_data 
+from pf_orchard_localization.data_managers import data_msgs
 
+from typing import TYPE_CHECKING, List, Dict, Tuple
+if TYPE_CHECKING:
+    from pf_orchard_localization import app_managers, app_modes
 
-class PfMainWindow(QMainWindow):
-    """
-    Main window for the particle filter application
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def init_window_display_settings(self):
-        """Initializes the window display settings"""
-
-        self.setGeometry(0, 0, 1700, 900)
-
-        # # Access the primary screen
-        # desktop = QGuiApplication.primaryScreen()
-        # target_screen_number = 0
-
-        # # Check the number of screens
-        # screens = QGuiApplication.screens()
-        # if target_screen_number < len(screens):
-        #     target_screen = screens[target_screen_number]
-        #     self.move(target_screen.geometry().left(), target_screen.geometry().top())
-        desktop = QApplication.desktop()
-        target_screen_number = 0
-        if target_screen_number < desktop.screenCount():
-            target_screen = desktop.screen(target_screen_number)
-            self.move(target_screen.geometry().left(), target_screen.geometry().top())
-
-        logging.debug(f"Target screen number: {target_screen_number}")
-        logging.debug(f"Screen size: {target_screen.geometry().width()} x {target_screen.geometry().height()}")
-        logging.debug(f"App size: {self.width()} x {self.height()}")
-        logging.debug(f"App position: {self.x()} x {self.y()}")
-
+logger = logging.getLogger(__name__)
 
 class PfChangeParametersButton(QWidget):
     """
     Widget for changing the particle filter parameters
     """
 
-    def __init__(self, main_app_manager):
+    def __init__(self, main_app_manager: 'app_managers.AnyManager'):
         super().__init__()
 
         self.main_app_manager = main_app_manager
@@ -188,7 +160,7 @@ class PfStartLocationControls(QWidget):
     Widget for setting the starting state of the particles
     """
 
-    def __init__(self, main_app_manager):
+    def __init__(self, main_app_manager: 'app_managers.AnyManager'):
         super().__init__()
 
         self.main_app_manager = main_app_manager
@@ -282,12 +254,12 @@ class PfStartLocationControls(QWidget):
             self.main_app_manager.print_message("Failed to set start location parameters")
 
     @pyqtSlot(dict)
-    def set_gps_position(self, gps_data):
+    def set_gps_position(self, gps_data: data_msgs.Gnss):
         """
         Set the GPS position from the GPS data
         """
-        self.gps_x = gps_data['easting']
-        self.gps_y = gps_data['northing']
+        self.gps_x = gps_data.map_x
+        self.gps_y = gps_data.map_y
 
     def set_start_location_from_gps(self):
         """
@@ -413,44 +385,25 @@ class Console(QWidget):
         """
         self.console.appendPlainText(message)
 
-class ImageDisplay(QWidget):
+
+class ImageLabel(QLabel):
     """
-    Widget for displaying images
+    Label for displaying images
     """
-    def __init__(self, num_camera_feeds=1, image_size=(480, 640), scale_factor=1.5):
-        """
-        Initialize the image display widget
+    def __init__(self, image_size=(480, 640), scale_factor=1.5):
         
-        Args:
-            num_camera_feeds (int): Number of camera feeds to display
-            image_size (tuple): Size of the image to display
-            scale_factor (float): Scale factor to apply to the image
-            """
-        super().__init__()
-
-        logging.debug(f"Starting Image Display with {num_camera_feeds} camera feeds, image size {image_size}, scale factor {scale_factor}")
-
-        self.num_camera_feeds = num_camera_feeds
         self.image_height = int(image_size[0] * scale_factor)
         self.image_width = int(image_size[1] * scale_factor)
+        
+        super().__init__()
 
-        self.main_layout = QHBoxLayout()
+        self.resize(self.image_height, self.image_width)
+        # self.setAlignment(Qt.AlignmentFlag.AlignCenter) # Qt6
+        self.setAlignment(Qt.AlignCenter)
 
-        self.picture_layout = QHBoxLayout()
-        self.picture_labels = []
-        for i in range(self.num_camera_feeds):
-            picture_label = QLabel(self)
-            picture_label.resize(self.image_height, self.image_width)
-            # picture_label.setAlignment(Qt.AlignmentFlag.AlignCenter) # Qt6
-            picture_label.setAlignment(Qt.AlignCenter)
-            self.picture_labels.append(picture_label)
-            self.picture_layout.addWidget(picture_label)
-            self.load_image(img=None, img_num=i)
+        self.load_image(None)
 
-        self.main_layout.addLayout(self.picture_layout)
-        self.setLayout(self.main_layout)
-
-    def load_image(self, img=None, img_num=0):
+    def load_image(self, img: np.ndarray):
         """
         Load an image into the GUI image viewer
         
@@ -463,19 +416,120 @@ class ImageDisplay(QWidget):
             img = np.ones((self.image_height, self.image_width, 3), dtype=np.uint8) * 155
 
         # Convert the image to a Qt image and display it
-        image_cv2 = img
-        image_rgb = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2RGB)
+        image_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
         # image_qt = QImage(image_rgb.data, image_rgb.shape[1], image_rgb.shape[0], QImage.Format.Format_RGB888) # Qt6
         image_qt = QImage(image_rgb.data, image_rgb.shape[1], image_rgb.shape[0], QImage.Format_RGB888)
         
         pixmap = QPixmap.fromImage(image_qt)
 
         # pixmap_scaled = pixmap.scaled(self.picture_labels[img_num].size(), Qt.AspectRatioMode.KeepAspectRatio) # Qt6
-        pixmap_scaled = pixmap.scaled(self.picture_labels[img_num].size(), Qt.KeepAspectRatio)
+        pixmap_scaled = pixmap.scaled(self.size(), Qt.KeepAspectRatio)
         
-        self.picture_labels[img_num].setPixmap(pixmap_scaled)
+        self.setPixmap(pixmap_scaled)
 
-        QApplication.processEvents()
+        # QApplication.processEvents()
+
+
+class ImageDisplay(QWidget):
+    """
+    Widget for displaying images
+    """
+
+    imageDisplayChangeSignal = pyqtSignal(dict)
+
+    def __init__(self, image_size=(480, 640), scale_factor=1.5):
+        """
+        Initialize the image display widget
+        
+        Args:
+            image_size (tuple): Size of the image to display
+            scale_factor (float): Scale factor to apply to the image
+            """
+        super().__init__()
+
+        self.image_height = int(image_size[0] * scale_factor)
+        self.image_width = int(image_size[1] * scale_factor)
+
+        self.checkbox_states: dict = {}
+
+        self.main_layout = QVBoxLayout()
+
+        self.checkboxes_layout = QHBoxLayout()
+        self.image_checkboxes: List[QCheckBox] = []
+        
+        self.checkboxes_layout.addWidget(QLabel("Extra Images to Show: "))
+        self.original_image_checkbox = QCheckBox("Original", checked=False)
+        self.unfiltered_image_checkbox = QCheckBox("Unfiltered", checked=False)
+        self.depth_image_checkbox = QCheckBox("Depth", checked=True)
+        
+        self.image_checkboxes.append(self.original_image_checkbox)
+        self.image_checkboxes.append(self.unfiltered_image_checkbox)
+        self.image_checkboxes.append(self.depth_image_checkbox)
+
+        for checkbox in self.image_checkboxes:
+            self.checkboxes_layout.addWidget(checkbox)
+            checkbox.stateChanged.connect(self.checkbox_changed)
+        self.checkboxes_layout.addStretch(1)
+
+        self.picture_layout = QHBoxLayout()
+        self.picture_labels: list[QLabel] = []
+
+        self.original_image_label = ImageLabel(image_size=image_size, scale_factor=scale_factor)
+        self.picture_labels.append(self.original_image_label)
+        self.unfiltered_segmented_image_label = ImageLabel(image_size=image_size, scale_factor=scale_factor)
+        self.picture_labels.append(self.unfiltered_segmented_image_label)
+        self.segmented_image_display = ImageLabel(image_size=image_size, scale_factor=scale_factor)
+        self.picture_labels.append(self.segmented_image_display)
+        self.depth_image_display = ImageLabel(image_size=image_size, scale_factor=scale_factor)
+        self.picture_labels.append(self.depth_image_display)
+        
+        for picture_label in self.picture_labels:
+            self.picture_layout.addWidget(picture_label)
+
+        self.main_layout.addLayout(self.checkboxes_layout)
+        self.main_layout.addLayout(self.picture_layout)
+
+        self.setLayout(self.main_layout)
+
+    def checkbox_changed(self):
+        """
+        Slot for when the checkboxes are changed
+        """
+        self.original_image_label.hide()
+        self.unfiltered_segmented_image_label.hide()
+        self.segmented_image_display.hide()
+        
+        self.checkbox_states = {}
+
+        if self.original_image_checkbox.isChecked():
+            self.original_image_label.show()
+            self.checkbox_states['original'] = True
+        if self.unfiltered_image_checkbox.isChecked():
+            self.unfiltered_segmented_image_label.show()
+            self.checkbox_states['unfiltered'] = True
+        if self.depth_image_checkbox.isChecked():
+            self.segmented_image_display.show()
+            self.checkbox_states['depth'] = True
+        
+        self.imageDisplayChangeSignal.emit(self.checkbox_states)
+    
+    @pyqtSlot(data_msgs.Image)
+    def set_images(self, image_msg_data: data_msgs.Image):
+        """
+        Set the images to display
+        
+        Args:
+            image_msg_data (data_msgs.Image): Image data to display
+        """
+        if image_msg_data.rgb_image is not None:
+            self.original_image_label.load_image(image_msg_data.rgb_image)
+        if image_msg_data.unfiltered_segmented_image is not None:
+            self.unfiltered_segmented_image_label.load_image(image_msg_data.unfiltered_segmented_image)
+        if image_msg_data.segmented_image is not None:
+            self.segmented_image_display.load_image(image_msg_data.segmented_image)
+        if image_msg_data.visualized_depth_image is not None:
+            self.depth_image_display.load_image(image_msg_data.visualized_depth_image)
 
 
 class PfModeSelector(QWidget):
@@ -506,7 +560,7 @@ class PfModeSelector(QWidget):
 
         self.setLayout(mode_selector_layout)
 
-    def set_modes(self, modes):
+    def set_modes(self, modes: List['app_modes.AnyMode']):
         """
         Set the modes in the mode selector
 
@@ -514,9 +568,13 @@ class PfModeSelector(QWidget):
             modes (list): List of modes to set
         """
 
+        self.mode_selector.blockSignals(True)
+        
         self.mode_selector.clear()
         for mode in modes:
             self.mode_selector.addItem(mode.mode_name)
+
+        self.mode_selector.blockSignals(False)
 
     @property
     def mode(self):
@@ -649,7 +707,7 @@ class ImageNumberLabel(QWidget):
         self.img_number_label.setText("Image " + str(img_number) + " of " + str(total_imgs))
 
 
-class ImageDelaySlider(QWidget):
+class TimeMultiplierSlider(QWidget):
     """
     Widget for setting the added delay between images when using recorded data
     """
@@ -657,20 +715,22 @@ class ImageDelaySlider(QWidget):
     def __init__(self):
         super().__init__()
 
-        label = QLabel("Delay Between Images:")
+        label = QLabel("Frame Delay Multiplier:")
 
-        start_value_ms = 0
+        initial_value = 100
 
         # self.slider = QSlider(Qt.Orientation.Horizontal) # Qt6
         self.slider = QSlider(Qt.Horizontal) 
         self.slider.setMinimum(0)
-        self.slider.setMaximum(500)
-        self.slider.setValue(start_value_ms)
+        self.slider.setMaximum(400)
+        self.slider.setValue(initial_value)
         self.slider.setTickInterval(10)
         # self.slider.setTickPosition(QSlider.TickPosition.NoTicks) # Qt6
         self.slider.setTickPosition(QSlider.NoTicks)        
 
-        self.value_label = QLabel(str(start_value_ms) + " ms")
+        # divide by 100 and round to 2 decimal places
+        time_label = f"{self.slider.value()/ 100:.2f}x"
+        self.value_label = QLabel(time_label)
 
         label.setFixedWidth(170)
         self.slider.setFixedWidth(150)
@@ -689,16 +749,18 @@ class ImageDelaySlider(QWidget):
         """
         Update the value label to the current value of the slider
         """
-        self.value_label.setText(str(self.slider.value()) + "ms")
+        time_label = f"{self.slider.value()/ 100:.2f}x"
+        self.value_label.setText(time_label)
+        
 
-    def get_delay_ms(self):
+    def get_multiplier_value(self):
         """
         Get the delay in ms
 
         Returns:
             int: The delay in ms
         """
-        return self.slider.value()
+        return self.slider.value()/100
 
 class PfQueueSizeLabel(QWidget):
     """
@@ -726,273 +788,7 @@ class PfQueueSizeLabel(QWidget):
         self.queue_size_label.setText("Queue Size: " + str(queue_size))
 
 
-class CachedDataCreator(QWidget):
-    """
-    Widget to aid in cacheing data in the app 
-    """
-    def __init__(self, main_app_manager):
-        """
-        Initialize the widget
-        
-        Args:
-            main_app_manager (PfMainAppManager): Main app manager
-        """
-        super().__init__()
 
-        self.main_app_manager = main_app_manager
-
-        self.cache_data_enabled = False
-        self.cache = {}
-
-        button_width = 140
-
-        self.enable_checkbox = QCheckBox("Cache Data")
-        self.enable_checkbox.setToolTip("Enable caching of data")
-        self.enable_checkbox.setChecked(self.cache_data_enabled)
-        self.enable_checkbox.setMinimumWidth(180)
-
-        self.save_label = QLabel("Save Directory:")
-        self.save_label.setToolTip("Directory to save the cached data in")
-        self.save_label.setMinimumWidth(105)
-
-        self.save_directory_input = QLineEdit()
-        self.save_directory_input.setToolTip("Directory to save the cached data in")
-        self.save_directory_input.setPlaceholderText("Save Directory")
-        self.save_directory_input.setReadOnly(True)
-
-        self.change_save_directory_button = QPushButton("Change")
-        self.change_save_directory_button.setToolTip("Change the directory to save the cached data in")
-        self.change_save_directory_button.setMinimumWidth(button_width)
-
-        self.save_images_checkbox = QCheckBox("Save Images")
-        self.save_images_checkbox.setToolTip("Save segmented image also for display on playback")
-        self.save_images_checkbox.setChecked(True)
-        self.save_images_checkbox.setMinimumWidth(button_width)
-
-        self.cache_size_label = QLabel("Cache Size: 0 messages")
-        self.cache_size_label.setToolTip("Number of messages currently in the cache")
-        self.cache_size_label.setMinimumWidth(180)
-
-        self.file_name_label = QLabel("File Name:")
-        self.file_name_label.setToolTip("Name of the file to save the cached data as")
-        self.file_name_label.setMinimumWidth(105)
-
-        self.file_name_input = QLineEdit()
-        self.file_name_input.setToolTip("Name of the file to save the cached data as")
-        self.start_text = "File Name (e.g. run1_data)"
-        self.file_name_input.setPlaceholderText(self.start_text)
-
-        self.save_button = QPushButton("Save Cache")
-        self.save_button.setToolTip("Save the cached data to the specified file")
-        self.save_button.setMinimumWidth(button_width)
-
-        self.reset_cache_button = QPushButton("Reset Cache")
-        self.reset_cache_button.setToolTip("Reset the cache")
-        self.reset_cache_button.setMinimumWidth(button_width)
-
-
-        self.main_layout = QVBoxLayout()
-        self.top_layout = QHBoxLayout()
-        self.bottom_layout = QHBoxLayout()
-
-        self.top_layout.addWidget(self.enable_checkbox)
-        self.top_layout.addWidget(self.save_label)
-        self.top_layout.addWidget(self.save_directory_input)
-        self.top_layout.addWidget(self.change_save_directory_button)
-        self.top_layout.addWidget(self.save_images_checkbox)
-
-        self.bottom_layout.addWidget(self.cache_size_label)
-        self.bottom_layout.addWidget(self.file_name_label)
-        self.bottom_layout.addWidget(self.file_name_input)
-        self.bottom_layout.addWidget(self.save_button)
-        self.bottom_layout.addWidget(self.reset_cache_button)
-
-        self.main_layout.addLayout(self.top_layout)
-        self.main_layout.addLayout(self.bottom_layout)
-
-        self.setLayout(self.main_layout)
-
-        self.enable_checkbox.stateChanged.connect(self.cache_data_checkbox_changed)
-        self.change_save_directory_button.clicked.connect(self.change_save_directory)
-        self.save_button.clicked.connect(self.save_cache)
-        self.reset_cache_button.clicked.connect(self.reset_cache)
-
-        self.cache_data_checkbox_changed()
-
-    @pyqtSlot()
-    def change_save_directory(self):
-        """
-        Slot for the changing the save directory for the cached data when the button is clicked
-        """
-        save_location = QFileDialog.getExistingDirectory(self, "Select Save Location") + "/"
-        self.save_directory_input.setText(save_location)
-        # check for "images" folder, if it doesn't exist, create it
-
-    @pyqtSlot()
-    def reset_cache(self):
-        """
-        Slot for resetting the cache when the button is clicked
-        """
-        self.cache = {}
-        self.cache_size_label.setText("Cache Size: 0 messages")
-
-    def get_timestamp_str(self, time_stamp):
-        """
-        Get the timestamp as a string
-
-        Args:
-            time_stamp (float): Time stamp
-        
-        Returns:
-            str: The time stamp as a string
-        """
-        return str(time_stamp*1000).split(".")[0]
-    
-    @pyqtSlot(dict)
-    def cache_data(self, msg):
-        """
-        Slot for caching data when it's received
-        
-        Args:
-            msg (dict): The message to cache
-        """
-        if msg['topic'] == "odom":
-            self.cache_odom_data(msg['x_odom'], msg['theta_odom'], msg['time_stamp'])
-            
-        elif msg['topic'] == "image":
-            self.cache_tree_data(msg['positions'], msg['widths'], msg['class_estimates'], msg['location_estimate'], msg['time_stamp'])
-            
-            if self.save_images_checkbox.isChecked() and msg['image'] is not None:
-                self.save_image(msg['image'], msg['time_stamp'])
-                
-    
-    def cache_odom_data(self, x_odom, theta_odom, time_stamp_odom):
-        """
-        Cache the odometry data
-
-        Args:
-            x_odom (float): X position of the odometry
-            theta_odom (float): Theta position of the odometry
-            time_stamp_odom (float): Time stamp of the odometry
-        """
-        self.cache[self.get_timestamp_str(time_stamp_odom)] = {"x_odom": x_odom, "theta_odom": theta_odom, "time_stamp": time_stamp_odom}
-        self.cache_size_label.setText("Cache Size: " + str(len(self.cache)) + " messages")
-
-    def cache_tree_data(self, positions, widths, class_estimates, location_estimate, time_stamp):
-        """
-        Cache the tree data
-
-        Args:
-            positions (np.array): Positions of the trees
-            widths (np.array): Widths of the trees
-            class_estimates (np.array): Class estimates of the trees
-            location_estimate (np.array): Location estimate of the trees
-            time_stamp (float): Time stamp of the tree data
-        """
-        if positions is None:
-            self.cache[self.get_timestamp_str(time_stamp)] = None
-            return
-        tree_data = {"positions": positions.tolist(), "widths": widths.tolist(), "classes": class_estimates.tolist()}
-        location_estimate = {"x": location_estimate[0], "y": location_estimate[1], "theta": location_estimate[2]}
-        self.cache[self.get_timestamp_str(time_stamp)] = {"tree_data": tree_data, "location_estimate": location_estimate}
-
-    @pyqtSlot()
-    def save_cache(self):
-        """
-        Slot for saving the cache when the button is clicked. Does some check to ensure the save location is valid
-        """
-        if len(self.cache) == 0:
-            self.main_app_manager.print_message("No data to save")
-            return
-
-        if not os.path.exists(self.save_directory_input.text()):
-            self.main_app_manager.print_message("Save directory does not exist")
-            return
-
-        if self.file_name_input.text() == "" or self.file_name_input.text() == self.start_text:
-            self.main_app_manager.print_message("Please enter a file name")
-            return
-
-        save_location = self.save_directory_input.text() + self.file_name_input.text() + ".json"
-
-        # check if file already exists, if so, have popup to ask if they want to overwrite
-        if os.path.exists(save_location):
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Warning)
-            msg_box.setText("File already exists")
-            msg_box.setInformativeText("Do you want to overwrite the file?")
-            # msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) # Qt6
-            # msg_box.setDefaultButton(QMessageBox.StandardButton.No)
-            # ret = msg_box.exec()
-            # if ret == QMessageBox.StandardButton.No:
-                # return
-            msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-            msg_box.setDefaultButton(QMessageBox.No)
-            ret = msg_box.exec()
-            if ret == QMessageBox.No:
-                return
-
-        with open(save_location, 'w') as f:
-            json.dump(self.cache, f)
-
-        self.main_app_manager.print_message("Cache saved to: " + save_location)
-
-    def save_image(self, img, time_stamp):
-        """
-        Save an image to the save location
-
-        Args:
-            img (np.array): Image to save
-            time_stamp (float): Time stamp of the image
-        """
-        if self.save_images_checkbox.isChecked() == False:
-            self.main_app_manager.print_message("Images not being saved")
-            return
-
-        save_directory = self.save_directory_input.text()
-
-        if not os.path.exists(save_directory):
-            self.main_app_manager.print_message("Save directory does not exist")
-            return
-
-        save_directory = save_directory + "images/"
-
-        if not os.path.exists(save_directory):
-            os.makedirs(save_directory)
-
-        save_location = save_directory + self.get_timestamp_str(time_stamp) + ".png"
-
-        cv2.imwrite(save_location, img)
-
-    @pyqtSlot()
-    def cache_data_checkbox_changed(self):
-        """
-        Slot for when the cache data checkbox is changed
-        """
-        if self.enable_checkbox.isChecked():
-            self.cache_data_enabled = True
-            self.set_input_disabled(False)
-        else:
-            self.cache_data_enabled = False
-            self.reset_cache()
-            self.set_input_disabled(True)
-
-    def set_input_disabled(self, disabled):
-        """
-        Set the input to disabled or not
-
-        Args:
-            disabled (bool): True to disable input, False to enable
-        """
-        self.save_images_checkbox.setDisabled(disabled)
-        self.save_directory_input.setDisabled(disabled)
-        self.change_save_directory_button.setDisabled(disabled)
-        self.file_name_input.setDisabled(disabled)
-        self.save_button.setDisabled(disabled)
-        self.reset_cache_button.setDisabled(disabled)
-        self.cache_size_label.setDisabled(disabled)
-        self.file_name_label.setDisabled(disabled)
-        self.save_label.setDisabled(disabled)
 
 class CalibrationDataControls(QWidget):
     """
@@ -1002,7 +798,7 @@ class CalibrationDataControls(QWidget):
     estimation algorithm.
     """
 
-    def __init__(self, main_app_manager):
+    def __init__(self, main_app_manager: "app_managers.RosBags"):
         """
         Initialize the widget
 
@@ -1065,8 +861,8 @@ class CalibrationDataControls(QWidget):
         
         self.previous_x_position_in_image = None
         
-    @pyqtSlot(dict)
-    def save_data(self, current_msg):
+    @pyqtSlot(data_msgs.Image)
+    def save_data(self, image_msg_data: data_msgs.Image):
         """
         This function will be called if the save calibration mode is active and the save data checkbox is checked. It first 
         check if a tree was seen, and if so it assumes the best particle is correct and finds the corresponding tree in the
@@ -1083,12 +879,12 @@ class CalibrationDataControls(QWidget):
         - measured_width: The measured width of the tree  
 
         Args:
-            current_msg (dict): The current message
+            image_msg_data (data_msgs.Image): Image message with the data to save
         """
         
-        x_positions_in_image = current_msg["x_positions_in_image"]
+        x_positions_in_image = image_msg_data.x_positions_in_image
 
-        if x_positions_in_image is None:
+        if image_msg_data.x_positions_in_image is None:
             self.main_app_manager.print_message("No trunk data available")
             return
 
@@ -1096,12 +892,13 @@ class CalibrationDataControls(QWidget):
             self.main_app_manager.print_message("Data not being saved")
             return
 
-        closest_objects, kept_idx = self.find_closest_tree()
+        closest_objects, kept_idx = self.find_closest_tree(image_msg_data)
 
         if len(closest_objects) == 0:
             self.main_app_manager.print_message("No tree detected")
             return
 
+        # TODO: I could probably just change find closest tree to just return the closest, but it'd also be weird for this to happen so idk, maybe be good to catch it
         if len(closest_objects) > 1:
             self.main_app_manager.print_message("More than one tree detected ???")
             return
@@ -1109,9 +906,8 @@ class CalibrationDataControls(QWidget):
         tree_data = closest_objects[0]
         kept_idx = kept_idx[0]
 
-        rgb_image = current_msg["rgb_image"]
-        depth_image = current_msg["depth_image"]
-        time_stamp = current_msg["timestamp"]
+        rgb_image = image_msg_data.rgb_image
+        depth_image = image_msg_data.depth_image
         save_location = self.save_location_input.text()
 
         rgb_dir = save_location + "rgb/"
@@ -1131,12 +927,9 @@ class CalibrationDataControls(QWidget):
 
         ground_truth_date = self.date_edit.value()
 
-        timestamp_secs = int(time_stamp)
-        timestamp_ns = int((time_stamp - timestamp_secs) * 1e9)
-        file_name = str(timestamp_secs) + "_" + str(timestamp_ns).zfill(9) + ".png"
+        file_name = str(image_msg_data.bag_timestamp) + ".png"
 
         data_note = self.data_note_input.text()
-
 
         tree_data.convert_to_lat_lon()
 
@@ -1164,7 +957,7 @@ class CalibrationDataControls(QWidget):
 
         self.main_app_manager.print_message("Data saved to: " + data_save_location)
 
-    def find_closest_tree(self):
+    def find_closest_tree(self, image_msg_data: data_msgs.Image) -> Tuple[List[map_data.ObjectData], List[int]]:
         """
         Find the closest tree to the best particle and return the tree data and the index of the tree in the trunk data
 
@@ -1172,33 +965,36 @@ class CalibrationDataControls(QWidget):
             list: List of the closest tree data
             list: List of the index of the tree in the trunk data
         """
-        tree_positions = self.main_app_manager.trunk_data_connection.positions
-        class_estimates = self.main_app_manager.trunk_data_connection.class_estimates
         best_particle = self.main_app_manager.pf_engine.best_particle
 
         # make the 3, array a 1,3 array
         best_particle = best_particle.reshape(1, -1)
 
-        tree_global_coords = self.main_app_manager.pf_engine.get_object_global_locations(best_particle, tree_positions)
+        tree_global_coords = self.main_app_manager.pf_engine.get_object_global_locations(best_particle, image_msg_data.object_locations)
 
-        closest_objects = []
+        closest_objects: List[map_data.ObjectData] = []
         kept_idx = []
 
         for i in range(len(tree_global_coords)):
 
-            if class_estimates[i] == 1:
+            # if the object is a post, skip it
+            if image_msg_data.object_classes[i] == 1:
                 continue
-
+            
+            # get the closest object to the best particle
             distance, idx = self.main_app_manager.pf_engine.kd_tree.query(tree_global_coords[i, :, :])
 
+            # if the distance is greater than 0.25m, skip it
             if distance > 0.25:
                 continue
+            
+            # Make a copy of the tree's map data
+            closest_object: map_data.ObjectData = copy.deepcopy(self.main_app_manager.map_data.map_data[idx[0]])
 
-            closest_object = copy.deepcopy(self.main_app_manager.map_data.map_data[idx[0]])
-
+            # If the tree has no ground truth width, skip it
             if closest_object.ground_truth_width is None:
                 continue
-
+            
             closest_objects.append(closest_object)
 
             kept_idx.append(i)
@@ -1248,10 +1044,4 @@ class CalibrationDataControls(QWidget):
             self.main_app_manager.trunk_data_connection.set_emitting_save_calibration_data(True)
         else:
             self.main_app_manager.trunk_data_connection.set_emitting_save_calibration_data(False)
-
-
-
-
-
-
 

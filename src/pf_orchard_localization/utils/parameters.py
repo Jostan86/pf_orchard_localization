@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from dataclasses import dataclass, asdict, fields
 import yaml
 import os
@@ -29,8 +28,13 @@ class Parameters:
             data = yaml.safe_load(file)
 
         for field in fields(self):
+            current_value = getattr(self, field.name)
             if field.name in data:
                 setattr(self, field.name, data[field.name])
+            elif current_value is not None:
+                logging.warning(f"Field {field.name} not found in yaml file, keeping current value")
+            elif current_value is None:
+                logging.warning(f"Field {field.name} not found in yaml file and is not yet set")
 
         self.log_settings()
 
@@ -50,7 +54,7 @@ class Parameters:
         """
         Log the current settings
         """
-        logging.info("Current settings:")
+        logging.debug("Current settings:")
         for field in fields(self):
             logging.debug(f"{field.name}: {getattr(self, field.name)}")
 
@@ -74,6 +78,8 @@ class ParametersPf(Parameters):
 
     r_dist: float = None
     r_angle: int = None
+    noise_fps: int = None
+
     width_sd: float = None
     range_sd: float = None
     bearing_sd: float = None
@@ -82,6 +88,15 @@ class ParametersPf(Parameters):
     bin_size: float = None
     bin_angle: int = None
     include_width: bool = None
+
+    use_orientation_for_angular_velocity: bool = None
+    num_readings_for_angular_velocity: int = None
+    use_orientation_for_particle_weights: bool = None
+    orientation_offset: float = None
+    print_orientation_offset: bool = None
+    orientation_sd: float = None
+
+    motion_update_max_dt: float = None
 
     stop_when_converged: bool = None
 
@@ -103,6 +118,7 @@ class ParametersCachedData(Parameters):
     data_file_dir: str = None
     cached_image_dir: str = None
     test_start_info_path: str = None
+    test_results_save_path: str = None
 
     initial_data_file_index: int = None
     initial_data_time: float = None
@@ -110,7 +126,6 @@ class ParametersCachedData(Parameters):
     pf_config_file_path: str = None
     map_data_path: str = None
 
-    image_fps: int = None
     use_visual_odom: bool = False
 
 @dataclass
@@ -123,33 +138,62 @@ class ParametersBagData(Parameters):
     depth_topic: str = None
     rgb_topic: str = None
     odom_topic: str = None
+    orientation_topic: str = None
+    gnss_corrected_topic: str = None
+    gnss_uncorrected_topic: str = None
     initial_data_time: float = None
     initial_data_file_index: int = None
-    image_fps: int = None
 
     pf_config_file_path: str = None
     map_data_path: str = None
-    image_save_dir: str = None
 
     image_display_scale: float = None
 
     use_ros_service_for_trunk_width: bool = False
-    use_visual_odom: bool = False
+    use_visual_odom: bool = True
+
+    every_nth_image: int = 1
 
 @dataclass
 class ParametersLiveData(Parameters):
     """
     Parameters for the live data version of the app
     """
-    depth_topic: str = os.environ.get("DEPTH_IMAGE_TOPIC")
-    rgb_topic: str = os.environ.get("RGB_IMAGE_TOPIC")
-    gnss_topic: str = os.environ.get("GNSS_TOPIC")
-    image_fps: int = os.environ.get("IMAGE_FPS")
+    depth_topic: str = None
+    rgb_topic: str = None
+    orientation_topic: str = None
+    gnss_corrected_topic: str = None
+    gnss_uncorrected_topic: str = None
     odom_topic: str = None
 
     pf_config_file_path: str = None
     map_data_path: str = None
 
     image_display_scale: float = None
+
+    def __post_init__(self):
+        self.check_and_set_to_env_var("depth_topic", "DEPTH_IMAGE_TOPIC")
+        self.check_and_set_to_env_var("rgb_topic", "RGB_IMAGE_TOPIC")
+        self.check_and_set_to_env_var("odom_topic", "ODOM_TOPIC")
+        self.check_and_set_to_env_var("orientation_topic", "ORIENTATION_TOPIC")
+        self.check_and_set_to_env_var("gnss_corrected_topic", "GNSS_CORRECTED_TOPIC")
+        self.check_and_set_to_env_var("gnss_uncorrected_topic", "GNSS_UNCORRECTED_TOPIC")
+
+    def check_and_set_to_env_var(self, field_name, env_var):
+        """
+        Check if the field is None and set it to the environment variable if it exists
+        
+        Args:
+            field_name (str): The name of the field
+            env_var (str): The name of the environment variable
+        """
+        value = os.environ.get(env_var)
+        if value is not None:
+            setattr(self, field_name, value)
+            logging.info(f"Setting {field_name} to {value} from environment variable {env_var}")
+        
+
+        
+
 
 

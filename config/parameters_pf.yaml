@@ -43,9 +43,31 @@ width_sd: 0.025
 # The standard deviations of the amount of noise to add to the linear and angular movements of the particles.
 r_angle: 20 # degrees
 r_dist: 0.6 # meters
+# This is used to standardize the amount of noise added to the linear and angular movements of the particles
+# It is currently the fps at which the system was tuned (50 fps).
+noise_fps: 50
 
 # Whether to include the width measurement in the likelihood calculation
 include_width: true
+
+# Set to true to use the change in the orientation output from the imu to override any other the angular velocity
+use_orientation_for_angular_velocity: True
+# The number of readings to average to get the angular velocity
+num_readings_for_angular_velocity: 5
+# Set to true to use the global orientation output from the imu to help calculate the particle weights.
+# If true, the orientation offset between the map and the sensor needs to be provided and accurate.
+use_orientation_for_particle_weights: True
+# The orientation offset between the map and the sensor, i.e. the orientation output's 'north' isn't aligned with the map's 'north', so this is the offset between them.
+orientation_offset: 1.02  # radians
+# Option to help determine the offset, prints the offset between the imu orientation and the best particles orientation
+# use_orientation_for_particle_weights should be set to false when using this option
+print_orientation_offset: False
+# The standard deviation of the expected noise from the orientation measurements made by the imu, used for the particle weight update.
+orientation_sd: 0.4 # radians
+
+# If the calculated time change between motion updates is greater than this value, the previous dt will be used or it will be skipped
+motion_update_max_dt: 1.0  # seconds
+
 
 # Maximum and minimum number of particles that the filter can have
 # These are optional, if not included the filter will not have a maximum or minimum number of particles

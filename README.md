@@ -98,7 +98,7 @@ Some sample data is available [here](https://1drv.ms/f/s!AhPJ6XcTEu5umc8Ljo8Ds4Z
 #### Paths to set for running in devcontainer
 If using the dev container, change this line in the docker compose file to point to the directory with the downloaded files.
 
-```/media/jostan/portabits/pf_app_data:/home/vscode/app_data:rw```
+```/media/jostan/Portabits/pf_app_data:/home/vscode/app_data:rw```
 
 Change to:
 

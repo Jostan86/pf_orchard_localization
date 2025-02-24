@@ -8,10 +8,10 @@ pf_parameters_path = "/home/jostan/OneDrive/Docs/Grad_school/Research/code_proje
 pf_parameters = ParametersPf()
 pf_parameters.load_from_yaml(pf_parameters_path)
 
-test_start_info_path = "/media/jostan/portabits/pf_app_data/test_starts2.csv"
-cached_data_files_directory = "/media/jostan/portabits/pf_app_data/pf_cached_data/pf_data"
+test_start_info_path = "/media/jostan/Portabits/pf_app_data/test_starts2.csv"
+cached_data_files_directory = "/media/jostan/Portabits/pf_app_data/pf_cached_data/pf_data"
     
-map_data_path = "/media/jostan/portabits/pf_app_data/map_data_jazz_new.json"
+map_data_path = "/media/jostan/Portabits/pf_app_data/map_data_jazz_new.json"
 map_data = MapData(map_data_path=map_data_path, move_origin=True, origin_offset=(5, 5))
 
 pf_engine = PfEngine(map_data=map_data)
@@ -27,5 +27,5 @@ pf_test_runner = PfTestExecutor(pf_engine=pf_engine,
 
 pf_test_runner.run_all_tests()
 
-pf_test_runner.process_results(save_path="/media/jostan/portabits/pf_app_data/pf_test_results4.csv")
+pf_test_runner.process_results(save_path="/media/jostan/Portabits/pf_app_data/pf_test_results4.csv")
     

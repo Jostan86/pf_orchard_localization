@@ -5,9 +5,9 @@ from nav_msgs.msg import Odometry
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
-from ..pf_threads import PfLiveThread
+from ..pf_run_threads import Live
 
-class PfLiveMode(QObject):
+class PfLive(QObject):
     """
     This class handles the Live Mode of the application. The Live Mode is used to run the particle filter on live data.
     """
@@ -48,7 +48,7 @@ class PfLiveMode(QObject):
         
         self.enable_disable_widgets(enable=False)
 
-        self.pf_thread = PfLiveThread(pf_engine=self.main_app_manager.pf_engine,
+        self.pf_thread = PfLive(pf_engine=self.main_app_manager.pf_engine,
                                      trunk_data_thread=self.main_app_manager.trunk_data_connection)
         
         self.pf_thread.pf_run_message.connect(self.main_app_manager.print_message)

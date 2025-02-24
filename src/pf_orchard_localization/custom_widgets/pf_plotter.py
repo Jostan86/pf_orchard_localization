@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
-
+from PyQt5.QtCore import pyqtSignal, Qt, QPointF, QThread, pyqtSlot
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QApplication
 import pyqtgraph as pg
 import time
-from PyQt5.QtCore import pyqtSignal, Qt, QPointF, QThread, pyqtSlot
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton
-from PyQt5.QtGui import QMouseEvent
 import numpy as np
+
 from map_data_tools import MapData
+from pf_orchard_localization.data_managers import data_msgs
+
 
 class ClickablePlotWidget(pg.PlotWidget):
     """
@@ -15,6 +15,12 @@ class ClickablePlotWidget(pg.PlotWidget):
     """
     
     clicked = pyqtSignal(float, float, bool)  # Signal to emit x and y coordinates
+
+    def __init__(self):
+        """
+        Constructor for the ClickablePlotWidget class
+        """
+        super().__init__()
 
     # def mousePressEvent(self, event: QMouseEvent): # Qt6
     #     # Convert QPoint to QPointF
@@ -46,6 +52,18 @@ class ClickablePlotWidget(pg.PlotWidget):
 
         super().mousePressEvent(event)
 
+    # def plot(self, *args, **kwargs):
+    #     """
+    #     Wrapper around the plot method to force type hints
+    #     """
+    #     super().plot(*args, **kwargs)
+    
+    # def clear(self):
+    #     """
+    #     Wrapper around the clear method to force type hints
+    #     """
+    #     super().clear()
+
 class PfPlotter(QWidget):
     """
     Class to handle all the plotting for the particle filter app
@@ -76,6 +94,12 @@ class PfPlotter(QWidget):
         # Set background to white and lock the aspect ratio
         self.plot_widget.setAspectLocked(True, ratio=1)
         self.plot_widget.setBackground('w')
+
+        self.particle_plot_item: pg.PlotDataItem = None
+        self.actual_position_plot_item: pg.PlotDataItem = None
+        self.position_estimate_plot_item: pg.PlotDataItem = None
+        self.gnss_estimate_plot_item: pg.PlotDataItem = None
+        self.gnss_corrected_estimate_plot_item: pg.PlotDataItem = None
 
         # Set the map data
         self.all_position_estimates = map_data.all_position_estimates
@@ -170,8 +194,15 @@ class PfPlotter(QWidget):
                                                                  pen=None,
                                                                  symbol='o',
                                                                  symbolBrush=(0, 0, 0),
-                                                                 symbolSize=self.dot_size * 2,
-                                                                 name='Pose Estimate')
+                                                                 symbolSize=self.dot_size * 1.5,
+                                                                 name='GNSS Uncorrected Estimate')
+        
+        self.gnss_corrected_estimate_plot_item = self.plot_widget.plot([], [],
+                                                                    pen=None,
+                                                                    symbol='o',
+                                                                    symbolBrush=(0, 0, 255),
+                                                                    symbolSize=self.dot_size * 1.5,
+                                                                    name='GNSS Corrected Estimate')
 
         
         self.update_particles(particles)
@@ -217,20 +248,32 @@ class PfPlotter(QWidget):
         else:
             self.actual_position_plot_item.setData([], [])
 
-    @pyqtSlot(dict)
-    def update_gnss_estimate(self, gnss_data):
+    @pyqtSlot(data_msgs.Gnss)
+    def update_gnss_corrected_estimate(self, gnss_data: data_msgs.Gnss = None):
         """
         Slot to update the dot representing the GNSS estimate of the position on the plot
 
         Args:
-            gnss_data (dict): A dictionary containing the easting and northing values of the GNSS estimate
+            gnss_data (GnssData): GNSS data
         """
         if gnss_data is not None:
-            easting = gnss_data["easting"]
-            northing = gnss_data["northing"]
-            self.gnss_estimate_plot_item.setData([easting], [northing])
+            self.gnss_corrected_estimate_plot_item.setData([gnss_data.map_x], [gnss_data.map_y])
+        else:
+            self.gnss_corrected_estimate_plot_item.setData([], [])
+
+    @pyqtSlot(data_msgs.Gnss)
+    def update_gnss_uncorrected_estimate(self, gnss_data: data_msgs.Gnss = None):
+        """
+        Slot to update the dot representing the GNSS estimate of the position on the plot
+
+        Args:
+            gnss_data (GnssData): GNSS data
+        """
+        if gnss_data is not None:
+            self.gnss_estimate_plot_item.setData([gnss_data.map_x], [gnss_data.map_y])
         else:
             self.gnss_estimate_plot_item.setData([], [])
+
 
     @pyqtSlot(np.ndarray)
     def update_position_estimate(self, position_estimate):

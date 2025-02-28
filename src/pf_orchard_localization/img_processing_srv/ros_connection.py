@@ -24,17 +24,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Ros2Service(img_processing_srv.DirectPkgConnection):
-    """Extends the TrunkDataConnection class to connect to get the trunk data from a ROS service"""
+    """Trunk data connection that retrieves trunk detection data from a ROS2 service.
+    
+    Sends RGB and depth images to a service for processing and receives detected trunk data.
+    """
     
     # overrides DirectPkgConnection
     def __init__(self,
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
                  ):
-        """
+        """Initializes the ROS2 service trunk data connector.
+
         Args:
-            class_mapping (tuple, optional): The mapping of classes from the trunk width estimation package to this one. Defaults to (1, 2, 0).
-            offset (tuple, optional): The offset to apply to the positions. Defaults to (0, 0).
+            class_mapping (tuple): Mapping of class values from service to internal representation
+            offset (tuple): X,Y position offset to apply to detected positions
         """
         super().__init__(class_mapping=class_mapping, offset=offset)
         
@@ -42,12 +46,22 @@ class Ros2Service(img_processing_srv.DirectPkgConnection):
     
     # overrides DirectPkgConnection
     def init_trunk_analyzer(self, width_estimation_config_file_path):
-        """Overrides the init_trunk_analyzer method because it is not needed for the ROS service"""
+        """Overrides trunk analyzer initialization with empty implementation.
+        
+        Not needed because processing happens in the ROS service.
+        
+        Args:
+            width_estimation_config_file_path (str): Unused config path
+        """
         pass
         
     # overrides DirectPkgConnection (but calls super)
     def run(self):
-        """Extends the run method to first initialize the ROS node and the service client"""
+        """Initializes ROS2 node and starts processing thread.
+        
+        Creates ROS2 service client for trunk data requests and starts the 
+        base class processing loop.
+        """
         rclpy.init(args=None)
         
         self.client_node = Ros2ServiceCaller()
@@ -56,14 +70,17 @@ class Ros2Service(img_processing_srv.DirectPkgConnection):
         
     # overrides DirectPkgConnection
     def get_trunk_data(self, current_msg, return_seg_img=False):
-        """Overrides the get_trunk_data method to instead call the ros service to get the trunk data
+        """Gets trunk detection data by calling a ROS2 service.
+        
+        Converts images to ROS messages, sends them to the service, and processes
+        the returned detection results.
         
         Args:
-            current_msg (dict): The current message
-            return_seg_img (bool, optional): If True, the segmented image will be returned. Defaults to False.
-
+            current_msg (dict): Message containing RGB and depth images
+            return_seg_img (bool): Whether to return segmentation visualization image
+            
         Returns:
-            tuple: The positions, widths, and class estimates of the trunks
+            tuple: Detected positions, widths, and classes (and optionally segmented image)
         """
 
         
@@ -100,13 +117,16 @@ class Ros2Service(img_processing_srv.DirectPkgConnection):
             return self.positions, self.widths, self.class_estimates, self.seg_img
         
     def tree_image_msg_2_trunk_data(self, tree_image_msg: TreeImageData):
-        """Extracts the positions, widths, and class estimates of the trunks from the TreeImageData message
+        """Converts ROS TreeImageData message to internal trunk data format.
+
+        Extracts detection information and segmentation visualization from the
+        service response message.
 
         Args:
-            tree_image_msg (TreeImageData): The TreeImageData message
+            tree_image_msg (TreeImageData): Service response with detection data
 
         Returns:
-            tuple: The positions, widths, and class estimates of the trunks
+            tuple: Tuple containing (positions, widths, classifications, segmented_image)
         """
         
         seg_image = self.bridge.imgmsg_to_cv2(tree_image_msg.segmented_image, desired_encoding="passthrough")
@@ -126,8 +146,10 @@ class Ros2Service(img_processing_srv.DirectPkgConnection):
         return np.array(tree_positions), np.array(widths), np.array(class_estimates), seg_image
     
 class Ros2ServiceCaller(Node):
-    """
-    A class to call the ROS2 service to get the trunk data
+    """ROS2 node that calls the trunk width estimation service.
+    
+    Provides methods to send image data to the trunk width estimation service
+    and receive detection results.
     """
 
     def __init__(self):
@@ -139,15 +161,14 @@ class Ros2ServiceCaller(Node):
         self.request = TreeImageProcessing.Request()
         
     def send_request(self, depth_image_msg, rgb_image_msg):
-        """
-        Sends a request to the service to get the trunk data then waits for the response
+        """Sends image data to trunk width service and waits for response.
 
         Args:
-            depth_image_msg (Image): The depth image message
-            rgb_image_msg (Image): The color image message
+            depth_image_msg (Image): ROS depth image message
+            rgb_image_msg (Image): ROS RGB image message
 
         Returns:
-            TreeImageData: The TreeImageData message
+            TreeImageData: Detection results or None if service call failed
         """        
         self.request.depth_image = depth_image_msg
         self.request.color_image = rgb_image_msg
@@ -162,8 +183,10 @@ class Ros2ServiceCaller(Node):
             return None
 
 class Ros2Sub(Ros2Service):
-    """
-    Extends the TrunkDataConnection class to connect to get the trunk data from a ROS subscriber. Used for the live mode of the app
+    """Trunk data connector that uses ROS2 subscriptions for live data.
+    
+    Instead of calling the trunk width service directly, subscribes to topics
+    where trunk detection results are published. Used for live operation mode.
     """
     trunk_data_signal = pyqtSignal(dict)
     odom_data_signal = pyqtSignal(dict)
@@ -172,9 +195,11 @@ class Ros2Sub(Ros2Service):
 
     # overrides Ros2Service
     def __init__(self, data_parameters: ParametersLiveData):
-        """
+        """Initializes ROS2 subscriber for live trunk data.
+        
         Args:
-            data_parameters (ParametersLiveData): The parameters for the live data version of the app
+            data_parameters (ParametersLiveData): Configuration parameters for live data
+                processing including topic names
         """
         super().__init__()
         self.node = None
@@ -185,8 +210,10 @@ class Ros2Sub(Ros2Service):
 
     # overrides Ros2Service
     def run(self):
-        """
-        Overrides the run method to instead initialize the ROS node and the subscribers and begin waiting for messages
+        """Initializes ROS2 node and creates topic subscriptions.
+        
+        Sets up subscriptions to tree detection results, odometry, and GNSS data,
+        and starts the ROS2 spin loop to process incoming messages.
         """
         rclpy.init()
         self.node = Node('pyqt5_subscriber_node')
@@ -235,14 +262,13 @@ class Ros2Sub(Ros2Service):
             rclpy.spin_once(self.node)
         
     def convert_to_decimal(self, dmm):
-        """
-        Converts the degrees minutes minutes format to decimal degrees
+        """Converts degrees-minutes format to decimal degrees.
         
         Args:
-            dmm (float): The degrees minutes minutes format
+            dmm (float): Coordinate in degrees-minutes format (DDMM.MMMM)
             
         Returns:
-            float: The decimal degrees
+            float: Coordinate in decimal degrees format
         """
         dmm = float(dmm)
         degrees = int(dmm // 100)
@@ -252,21 +278,31 @@ class Ros2Sub(Ros2Service):
         
 
     def gnss_uncorrected_callback(self, msg: NavSatFix):
-        """Callback for the uncorrected GNSS data"""
+        """Processes incoming uncorrected GNSS data and emits signal.
+        
+        Args:
+            msg (NavSatFix): Raw GNSS data message
+        """
         gnss_msg = data_msgs.Gnss.from_rosbags_msg(msg, corrected=False)
         self.uncorrected_gnss_data_signal.emit(gnss_msg)
     
     def gnss_corrected_callback(self, msg):
-        """Callback for the corrected GNSS data"""
+        """Processes incoming corrected GNSS data and emits signal.
+        
+        Args:
+            msg (NavSatFix): Corrected GNSS data message
+        """
         gnss_msg = data_msgs.Gnss.from_rosbags_msg(msg, corrected=True)
         self.corrected_gnss_data_signal.emit(gnss_msg)
 
     def tree_image_data_callback(self, tree_image_data):
-        """
-        Callback for the tree image data, packages the data and emits a signal with the data
-
+        """Processes incoming trunk detection data and emits signal.
+        
+        Converts ROS tree detection message to internal format and emits signal
+        with detection results and timestamp.
+        
         Args:
-            tree_image_data (TreeImageData): The tree image data message
+            tree_image_data (TreeImageData): Tree detection results message
         """
             
         tree_positions, widths, class_estimates, seg_img = self.tree_image_msg_2_trunk_data(tree_image_data)
@@ -280,11 +316,12 @@ class Ros2Sub(Ros2Service):
         self.trunk_data_signal.emit(tree_image_data)
     
     def rgb_img_msg_callback(self, rgb_img_msg):
-        """
-        Callback for the RGB image data, emits a signal with the RGB image data
-
+        """Processes incoming RGB images and emits display signal.
+        
+        Converts ROS image message to OpenCV format and emits display signal.
+        
         Args:
-            rgb_img_msg (Image): The RGB image message
+            rgb_img_msg (Image): ROS RGB image message
         """
 
         
@@ -292,19 +329,23 @@ class Ros2Sub(Ros2Service):
         self.signal_original_image.emit(rgb_image, self.original_image_display_num)
     
     def odom_data_callback(self, odom_data):
-        """
-        Callback for the optical flow odometry data, emits a signal with the odometry data
-
+        """Processes incoming odometry data and emits signal.
+        
+        Extracts timestamp and displacement from optical flow odometry message
+        and emits signal with the data.
+        
         Args:
-            odom_data (StampedFloat): The odometry data message
+            odom_data (StampedFloat): Optical flow odometry message
         """
         timestamp = odom_data.header.stamp.sec + odom_data.header.stamp.nanosec * 1e-9
         odom_data = {"timestamp": timestamp, "linear_displacment": odom_data.data}
         self.odom_data_signal.emit(odom_data)
     
     def reset_optical_flow(self):
-        """
-        Resets the optical flow odometry
+        """Calls service to reset the optical flow odometry.
+        
+        Sends request to optical flow node to reset accumulated displacement
+        and reports success or failure to the user.
         """
         future = self.reset_optical_flow_client.call_async(Trigger.Request())
         rclpy.spin_until_future_complete(self.node, future)
@@ -316,17 +357,22 @@ class Ros2Sub(Ros2Service):
     
     @pyqtSlot(bool)
     def publish_converged(self, converged):
-        """
-        Slot to publish a message indicating if the particle filter has converged
-
+        """Publishes convergence status of the particle filter to ROS.
+        
+        Makes the particle filter convergence status available to other ROS nodes.
+        
         Args:
-            converged (bool): If True, the particle filter has converged
+            converged (bool): Whether the particle filter has converged
         """
         msg = Bool()
         msg.data = converged
         self.converged_pub.publish(msg)
                 
     def stop(self):
+        """Shuts down the ROS2 node.
+        
+        Properly terminates ROS2 communications when module is stopped.
+        """
         rclpy.shutdown()
     
     # override some methods to make sure they aren't being called, mostly for debugging

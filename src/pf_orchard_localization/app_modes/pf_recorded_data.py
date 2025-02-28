@@ -11,15 +11,20 @@ import logging
 logger = logging.getLogger(__name__)        
     
 class PfRecordedData(QObject):
-    """
-    This class handles the Recorded Data Mode of the application. The Recorded Data Mode is used to run the particle filter on 
-    ros2 bag data.
+    """Mode for running the particle filter on pre-recorded data.
+    
+    Handles the Recorded Data Mode of the application which processes
+    data from ROS2 bag files to run the particle filter.
     """
     
     stop_pf_signal = pyqtSignal()
     
     def __init__(self, main_app_manager: Union['app_managers.RosBags', 'app_managers.Cached']):
-        """Initialize the mode"""
+        """Initialize the recorded data mode.
+        
+        Args:
+            main_app_manager: Reference to the main application manager
+        """
 
         self.main_app_manager = main_app_manager
 
@@ -35,16 +40,20 @@ class PfRecordedData(QObject):
 
         self.using_cached_data = False
 
-    def ensure_pf_stopped(self):
-        """Ensures that the particle filter thread is stopped"""
+    def ensure_pf_stopped(self) -> None:
+        """Ensure that the particle filter thread is stopped before mode change."""
 
         if self.thread_deleted:
             return 
         
         self.stop_button_clicked()
 
-    def enable_disable_widgets(self, enable):
-        """Enables/disables the widgets in the GUI when the PF thread is running"""
+    def enable_disable_widgets(self, enable: bool) -> None:
+        """Enable or disable GUI widgets based on particle filter state.
+        
+        Args:
+            enable (bool): True to enable widgets, False to disable
+        """
 
         self.main_app_manager.mode_selector.setEnabled(enable)
         self.main_app_manager.change_parameters_button.setEnabled(enable)
@@ -64,17 +73,23 @@ class PfRecordedData(QObject):
         
         self.enable_disable_widgets_unique(enable)
     
-    def enable_disable_widgets_unique(self, enable):
-        """Enables or disables the widgets that are unique to this mode when the PF thread is running.
-        Subclasses should override this method."""
+    def enable_disable_widgets_unique(self, enable: bool) -> None:
+        """Enable or disable widgets specific to this mode.
+        
+        Args:
+            enable (bool): True to enable widgets, False to disable
+            
+        Note:
+            Subclasses should override this method for mode-specific widgets.
+        """
 
         self.main_app_manager.cached_data_creator.enable_checkbox.setEnabled(enable)
         
-    def start_pf(self, single_image):     
-        """Starts the particle filter thread
+    def start_pf(self, single_image: bool) -> None:     
+        """Start the particle filter thread with recorded data.
 
         Args:
-            single_image: bool: True to run one image then stop, False to run continuously
+            single_image (bool): True to process a single image only, False to run continuously
         """        
         self.thread_deleted = False
         
@@ -112,16 +127,16 @@ class PfRecordedData(QObject):
         
         self.pf_thread.start()        
         
-    def thread_clean_up(self):
-        """Cleans up the particle filter thread after it has finished"""
+    def thread_clean_up(self) -> None:
+        """Clean up resources after particle filter thread has finished."""
         self.pf_thread.wait()
         
         self.pf_thread.deleteLater()
         
         self.enable_disable_widgets(enable=True)
 
-    def activate_mode(self):
-        """Activates the recorded data mode"""
+    def activate_mode(self) -> None:
+        """Activate recorded data mode and initialize UI components."""
 
         self.mode_active = True
 
@@ -130,8 +145,8 @@ class PfRecordedData(QObject):
 
         self.main_app_manager.reset_pf()
 
-    def setup_gui(self):
-        """Sets up the GUI for the mode"""
+    def setup_gui(self) -> None:
+        """Configure and display UI elements for recorded data mode."""
 
         self.main_app_manager.mode_selector.show()
         self.main_app_manager.change_parameters_button.show()
@@ -150,14 +165,14 @@ class PfRecordedData(QObject):
         self.main_app_manager.plotter.show()
     
     @pyqtSlot()
-    def thread_deleted_slot(self):
-        """Slot to handle when the thread is deleted, connected to the destroyed signal of the particle filter thread"""
+    def thread_deleted_slot(self) -> None:
+        """Handle thread deletion signal from the particle filter thread."""
 
         self.thread_deleted = True
         
     @pyqtSlot()
-    def start_button_clicked(self):
-        """Slot to handle the start button clicked signal, starts the particle filter thread"""
+    def start_button_clicked(self) -> None:
+        """Handle start button click by starting continuous particle filter processing."""
 
         if not self.thread_deleted:
             return
@@ -165,8 +180,8 @@ class PfRecordedData(QObject):
         self.start_pf(False)
     
     @pyqtSlot()
-    def continue_button_clicked(self):
-        """Slot to handle the continue button clicked signal, sends one image through the particle filter"""
+    def continue_button_clicked(self) -> None:
+        """Handle continue button click by processing a single image."""
 
         if not self.thread_deleted:
             return
@@ -174,32 +189,32 @@ class PfRecordedData(QObject):
         self.start_pf(True)
     
     @pyqtSlot()
-    def stop_button_clicked(self):
-        """Slot to handle the stop button clicked signal, stops the particle filter thread if it's running"""
+    def stop_button_clicked(self) -> None:
+        """Handle stop button click by stopping the particle filter thread."""
 
         if self.thread_deleted:
             return
         
         self.stop_pf_signal.emit()
         
-    def connect_gui(self):
-        """Connects the GUI signals to the slots for the recorded data mode"""
+    def connect_gui(self) -> None:
+        """Connect GUI signals to slots for the recorded data mode."""
 
         self.main_app_manager.control_buttons.startButtonClicked.connect(self.start_button_clicked)
         self.main_app_manager.control_buttons.stopButtonClicked.connect(self.stop_button_clicked)
         self.main_app_manager.control_buttons.single_step_button.clicked.connect(self.continue_button_clicked)
         
     
-    def disconnect_gui(self):
-        """Disconnects the GUI signals from the slots for the recorded data mode"""
+    def disconnect_gui(self) -> None:
+        """Disconnect GUI signals from slots for the recorded data mode."""
 
         self.main_app_manager.control_buttons.startButtonClicked.disconnect(self.start_button_clicked)
         self.main_app_manager.control_buttons.stopButtonClicked.disconnect(self.stop_button_clicked)
         self.main_app_manager.control_buttons.single_step_button.clicked.disconnect(self.continue_button_clicked)
         self.main_app_manager.cached_data_creator.enable_checkbox.setChecked(False)
     
-    def deactivate_mode(self):
-        """Deactivates the recorded data mode"""
+    def deactivate_mode(self) -> None:
+        """Deactivate the recorded data mode and clean up resources."""
 
         if not self.mode_active:
             return
@@ -211,8 +226,8 @@ class PfRecordedData(QObject):
         self.ensure_pf_stopped()
    
 
-    def shutdown_hook(self):
-        """Hook to run when the application is shutting down, ensures the particle filter thread is stopped"""
+    def shutdown_hook(self) -> None:
+        """Handle application shutdown by ensuring particle filter thread is stopped."""
 
         self.ensure_pf_stopped()
 

@@ -13,8 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class DataFileControls(QWidget):
-    """
-    This widget is used to control the data file selection and loading of data files
+    """Widget for data file selection, loading, and navigation in the application.
     """
     
     data_file_controls_message = pyqtSignal(str)
@@ -25,12 +24,12 @@ class DataFileControls(QWidget):
     def __init__(self, 
                  data_parameters: Union[ParametersBagData, ParametersCachedData],
                  using_cached_data: bool = False):
-        """
-        Initialize the data file controls widget
+        """Initializes the data file controls widget with appropriate parameters.
 
         Args:
-            data_parameters: Parameters for the data file controls
-            using_cached_data (bool): Whether to use cached data files
+            data_parameters (Union[ParametersBagData, ParametersCachedData]): Configuration parameters 
+                for data loading
+            using_cached_data (bool): Whether to use cached JSON data files instead of ROS bags
         """
         super().__init__()
 
@@ -92,19 +91,17 @@ class DataFileControls(QWidget):
     
     @pyqtSlot(float)
     def set_time_line(self, timestamp: float):
-        """
-        Slot to set the time line edit box to a given time stamp
+        """Updates the time display field with the current timestamp.
 
         Args:
-            timestamp (float): The time stamp to set the time line to
+            timestamp (float): Timestamp to display (in seconds)
         """
         timestamp = round(timestamp, 2)
         self.data_file_time_line.setText(str(timestamp))
     
     @pyqtSlot()
     def trigger_open_data_file(self):
-        """
-        Slot to trigger the opening of a data file from the open button
+        """Opens the currently selected data file when the open button is clicked.
         """
         self.open_data_file(self.current_data_file_selection)
 

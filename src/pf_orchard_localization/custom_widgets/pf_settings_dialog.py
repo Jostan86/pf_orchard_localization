@@ -2,27 +2,24 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDialogButt
 from ..utils.parameters import ParametersPf
 
 class PfSettingsDialog(QDialog):
-    """
-    A dialog box that allows the user to change settings for the particle filter
+    """Dialog for modifying particle filter algorithm parameters.
     """
 
-    def __init__(self, current_settings=None, parent=None, ):
-        """
-        Extends QDialog to create a dialog box for changing particle filter settings
+    def __init__(self, current_settings=None, parent=None):
+        """Initializes a dialog for changing particle filter settings.
         
         Args:
-            current_settings (ParametersPf): The current settings for the particle filter
-            parent (QWidget): The parent widget for the dialog box
+            current_settings (ParametersPf): Current particle filter parameters
+            parent (QWidget): Parent widget
         """
         super(PfSettingsDialog, self).__init__(parent)
         self.init_ui(current_settings)
 
     def init_ui(self, current_settings: ParametersPf):
-        """
-        Initializes the UI for the dialog box
+        """Sets up the dialog UI with input fields for all particle filter parameters.
 
         Args:
-            current_settings (ParametersPf): The current settings for the particle filter
+            current_settings (ParametersPf): Current particle filter parameters
         """
 
         layout = QVBoxLayout()
@@ -83,11 +80,10 @@ class PfSettingsDialog(QDialog):
 
 
     def get_settings(self):
-        """
-        Returns the settings entered by the user if they are valid
+        """Retrieves and validates user-entered particle filter settings.
 
         Returns:
-            ParametersPf: The settings entered by the user
+            ParametersPf: Updated settings object, or None if validation fails
         """
 
         try:

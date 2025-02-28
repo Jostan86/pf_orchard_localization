@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from trunk_width_estimation.width_estimation import TrunkAnalyzerData
 
 class MsgType(Enum):
-    """Enum for setting the message type"""
+    """Enum for setting the message type."""
 
     WHEEL_ODOM = 0
     VISUAL_ODOM = 1
@@ -28,7 +28,7 @@ class MsgType(Enum):
     POSE_ESTIMATE = 6
 
 class Source(Enum):
-    """Enum for setting the message source"""
+    """Enum for setting the message source."""
 
     ROS1BAG = 0  # using ros1 rosbag package
     ROS2BAG = 1  # using python rosbags package
@@ -36,14 +36,21 @@ class Source(Enum):
 
 @dataclass
 class Timestamp:
-    """Class for handling timestamps"""
+    """Class for handling timestamps with second and nanosecond precision."""
 
     sec: int
     nanosec: int
     
     @classmethod
     def from_decimal(cls, decimal_timestamp: float) -> 'Timestamp':
-        """Create a timestamp from a decimal value"""
+        """Create a timestamp from a decimal value.
+        
+        Args:
+            decimal_timestamp (float): Time in seconds as a floating point number
+            
+        Returns:
+            Timestamp: New timestamp object
+        """
         return cls(int(decimal_timestamp), int((decimal_timestamp % 1) * 1e9))
     
     @classmethod

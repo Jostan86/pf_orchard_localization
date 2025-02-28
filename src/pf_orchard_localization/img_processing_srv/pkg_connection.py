@@ -26,8 +26,10 @@ def make_trunk_analyzer_data_from_images(rgb_image, depth_image) -> 'TrunkAnalyz
     return TrunkAnalyzerData.from_images(rgb_image, depth_image)
 
 class DirectPkgConnection(QThread):
-    """
-    Thread to get the trunk data from the trunk width estimation package
+    """Thread for processing trunk width estimation requests.
+    
+    Processes images to detect trees and estimate trunk widths using the trunk_width_estimation package.
+    Runs in a separate thread to prevent blocking the GUI during image processing.
     """
 
     signal_save_calibration_data = pyqtSignal(dict)
@@ -40,11 +42,13 @@ class DirectPkgConnection(QThread):
                  class_mapping=(1, 2, 0),
                  offset=(0, 0),
                  ):
-        """
+        """Initializes trunk width estimation thread.
+        
         Args:
-            width_estimation_config_file_path (str, optional): The path to the width estimation config file. Defaults to None.
-            class_mapping (tuple, optional): The mapping of classes for the trunk data. Defaults to (1, 2, 0).
-            offset (tuple, optional): The offset to apply to the positions. Defaults to (0, 0).
+            using_cached_data (bool): Whether using cached data rather than processing images
+            width_estimation_config_file_path (str): Path to configuration file for trunk width estimation
+            class_mapping (tuple): Mapping of object classification values between systems
+            offset (tuple): X,Y position offset to apply to detected objects
         """
         super().__init__()
 
@@ -67,11 +71,11 @@ class DirectPkgConnection(QThread):
         self.unprocessed_image_data_msg: data_msgs.Image = None        
 
     def init_trunk_analyzer(self, width_estimation_config_file_path: str):
-        """
-        Initialize the trunk analyzer and segmenter
+        """Initializes the trunk width analyzer and segmenter.
         
         Args:
-            width_estimation_config_file_path (str): The path to the width estimation config file"""
+            width_estimation_config_file_path (str): Path to configuration file for trunk analyzer
+        """
         self.mutex.lock()
         
         # TODO: should use the actual config file i'd imagine
@@ -82,8 +86,12 @@ class DirectPkgConnection(QThread):
 
     @pyqtSlot(data_msgs.Image)
     def handle_request(self, image_data_msg: data_msgs.Image):
-        """ 
-        Receive a request for trunk data and saves the request data
+        """Queues incoming image data for processing.
+        
+        Stores the image data and signals the worker thread to start processing.
+        
+        Args:
+            image_data_msg (data_msgs.Image): Image message to process
         """
         self.mutex.lock()
         self.unprocessed_image_data_msg = image_data_msg
@@ -92,8 +100,10 @@ class DirectPkgConnection(QThread):
         self.mutex.unlock()
         
     def run(self):
-        """
-        The main loop of the thread, waits for trunk data requests and processes them
+        """Main processing loop for the thread.
+        
+        Waits for image requests, processes them for trunk detection,
+        and emits signals with the processed results.
         """
         while True:
             self.mutex.lock()
@@ -111,14 +121,16 @@ class DirectPkgConnection(QThread):
             self.mutex.unlock()
 
     def get_trunk_data(self, img_data_msg: data_msgs.Image) -> data_msgs.Image:
-        """
-        Get the trunk data from the trunk width estimation package
+        """Processes images to extract trunk detection and width information.
+
+        Uses the trunk_width_estimation package to detect trees and measure trunk widths.
+        Enriches the image message with detections and optionally visualization images.
 
         Args:
-            img_data_msg (data_msgs.Image): The image data message
+            img_data_msg (data_msgs.Image): Input image message containing RGB and depth images
 
         Returns:
-            data_msgs.Image: The image data message with the trunk data added
+            data_msgs.Image: Enhanced image message with trunk detection data
         """
         logger.debug(f"Getting trunk data for image with timestamp: {img_data_msg.bag_timestamp}")
 
@@ -148,12 +160,11 @@ class DirectPkgConnection(QThread):
         return img_data_msg
 
     def print_messages(self, positions, widths):
-        """
-        Print the messages for the positions and widths
+        """Formats and emits detection results as human-readable messages.
 
         Args:
-            positions (np.array): The positions of the trunks
-            widths (np.array): The widths of the trunks
+            positions (np.array): Array of detected trunk positions
+            widths (np.array): Array of detected trunk widths in meters
         """
         messages = []
 
@@ -173,21 +184,20 @@ class DirectPkgConnection(QThread):
             
     
     def set_emitting_save_calibration_data(self, emitting_save_calibration_data):
-        """
-        Set whether to emit the save calibration data signal
+        """Controls whether to emit signals for calibration data recording.
 
         Args:
-            emitting_save_calibration_data (bool): Whether to emit the save calibration data signal
+            emitting_save_calibration_data (bool): Whether to emit calibration data signals
         """
         self.emitting_save_calibration_data = emitting_save_calibration_data
 
     @pyqtSlot(dict)
     def set_images_to_include(self, images_to_include):
-        """
-        Slot to set the display position for the segmented image
+        """Controls which visualization image types to include in results.
 
         Args:
-            images_to_include (dict): The images to include
+            images_to_include (dict): Dictionary with boolean flags for image types
+                to include (e.g., {'unfiltered': True, 'depth': False})
         """
         if 'unfiltered' not in images_to_include:
             images_to_include['unfiltered'] = False

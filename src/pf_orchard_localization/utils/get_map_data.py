@@ -1,17 +1,20 @@
 import json
 import numpy as np
 
-def get_map_data(map_data_path, move_origin=True, origin_offset=5):
-    """
-    Load the map data from the json file and package it into a dictionary
-
+def get_map_data(map_data_path: str, move_origin: bool = True, origin_offset: int = 5) -> dict:
+    """Load the map data from the json file and package it into a dictionary.
     Args:
-        map_data_path (str): The path to the map data json file
-        move_origin (bool, optional): If True, move the origin to the min x and y values. Defaults to True.
-        origin_offset (int, optional): The offset to apply to the origin. Defaults to 5.
-
+        map_data_path (str): The path to the map data json file.
+        move_origin (bool): If True, move the origin to the min x and y values. Defaults to True.
+        origin_offset (int): The offset to apply to the origin. Defaults to 5.
     Returns:
-        dict: A dictionary containing the map data
+        dict: A dictionary containing the map data with keys:
+            - all_class_estimates (numpy.ndarray): Class estimates for each object.
+            - all_position_estimates (numpy.ndarray): Position estimates (x,y) for each object.
+            - all_width_estimates (numpy.ndarray): Width estimates for each object.
+            - object_numbers (numpy.ndarray): Object identification numbers.
+            - test_tree_numbers (list): Numbers of trees marked as test trees.
+            - test_tree_indexes (numpy.ndarray): Boolean array indicating test trees.
     """
 
     # Load the tree data dictionary

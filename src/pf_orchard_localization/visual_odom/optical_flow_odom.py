@@ -11,16 +11,25 @@ import logging
 logger = logging.getLogger(__name__)
 
 class OpticalFlowOdometerThread(QThread):
+    """Thread for estimating visual odometry using optical flow.
+    
+    Runs the optical flow algorithm in a separate thread to avoid blocking the main UI.
+    """
     signal_request_processed = pyqtSignal(object)
     
     def __init__(self):
+        """Initialize the optical flow odometer thread."""
         super().__init__()
         self.image_data_msg = None
         self.wait_condition = QWaitCondition()
         self.mutex = QMutex()
         self.optical_flow_estimator = OpticalFlowOdometer()
     
-    def run(self):
+    def run(self) -> None:
+        """Thread execution loop that processes incoming image messages.
+        
+        Waits for image messages, estimates odometry, and emits the result.
+        """
         while True:
             self.mutex.lock()
             self.wait_condition.wait(self.mutex)
@@ -36,17 +45,32 @@ class OpticalFlowOdometerThread(QThread):
             self.mutex.unlock()
         
     @pyqtSlot(data_msgs.Image)
-    def handle_request(self, image_data_msg: data_msgs.Image):
+    def handle_request(self, image_data_msg: data_msgs.Image) -> None:
+        """Process a new image message for odometry estimation.
+        
+        Args:
+            image_data_msg (data_msgs.Image): Image message containing RGB and depth data
+        """
         self.mutex.lock()
         self.image_data_msg = image_data_msg
-        
-        
         self.wait_condition.wakeAll()
         self.mutex.unlock()
         
 
 class OpticalFlowOdometer:
+    """Estimates visual odometry using optical flow between consecutive RGB-D images.
+    
+    Uses SIFT feature detection and matching combined with depth information to 
+    estimate the camera movement between frames.
+    """
+    
     def __init__(self, intrinsic_matrix=None, scale=0.5):
+        """Initialize the optical flow odometer.
+        
+        Args:
+            intrinsic_matrix (np.ndarray, optional): Camera intrinsic matrix
+            scale (float, optional): Scale factor for image downsampling
+        """
         self.sift = cv2.SIFT_create()
 
         if intrinsic_matrix is None:
@@ -63,11 +87,29 @@ class OpticalFlowOdometer:
         self.descriptors_previous = None
         self.depth_image_previous = None
 
-    def filter_depth_image(self, depth_img):
+    def filter_depth_image(self, depth_img: np.ndarray) -> np.ndarray:
+        """Apply median filter to depth image to reduce noise.
+        
+        Args:
+            depth_img (np.ndarray): Raw depth image
+            
+        Returns:
+            np.ndarray: Filtered depth image
+        """
         return median_filter(depth_img, size=5)
 
-    def get_matched_keypoints(self, rgb_img, depth_img):
-        # get keypoints and descriptors
+    def get_matched_keypoints(self, rgb_img: np.ndarray, depth_img: np.ndarray):
+        """Find and match keypoints between current and previous images.
+        
+        Args:
+            rgb_img (np.ndarray): Current RGB image
+            depth_img (np.ndarray): Current depth image
+            
+        Returns:
+            tuple: Tuple containing (points_previous_img_3d, points_current_img_2d) or (None, None)
+                if this is the first image or no good matches were found
+        """
+        # Get keypoints and descriptors
         keypoints_2D, descriptors = self.sift.detectAndCompute(rgb_img, None)
         
         if self.keypoints_previous is None or self.descriptors_previous is None or self.depth_image_previous is None:
@@ -116,7 +158,18 @@ class OpticalFlowOdometer:
 
         return points_previous_img_3d, points_current_img_2d
 
-    def get_movement_estimate(self, rgb_img, depth_img):
+    def get_movement_estimate(self, rgb_img: np.ndarray, depth_img: np.ndarray):
+        """Estimate camera movement between consecutive frames.
+        
+        Args:
+            rgb_img (np.ndarray): Current RGB image
+            depth_img (np.ndarray): Current depth image
+            
+        Returns:
+            tuple: Tuple containing (translation_vector, rotation_vector) or (None, None)
+                if movement could not be estimated
+        """
+        # Resize images according to scale factor
         rgb_img = cv2.resize(rgb_img, (int(rgb_img.shape[1] * self.scale), int(rgb_img.shape[0] * self.scale)))
         depth_img = cv2.resize(depth_img, (int(depth_img.shape[1] * self.scale), int(depth_img.shape[0] * self.scale)))
         
@@ -153,6 +206,16 @@ class OpticalFlowOdometer:
         return translation_vector, rotation_vector
     
     def get_odom_estimate(self, rgb_img: np.ndarray, depth_img: np.ndarray) -> float:
+        """Estimate linear displacement in the forward direction.
+        
+        Args:
+            rgb_img (np.ndarray): Current RGB image
+            depth_img (np.ndarray): Current depth image
+            
+        Returns:
+            float: Linear displacement in meters in the forward direction (X axis),
+                or None if estimation failed
+        """
         try:            
             translation_vector, rotation_vector = self.get_movement_estimate(rgb_img, depth_img)
         except Exception as e:
@@ -162,6 +225,7 @@ class OpticalFlowOdometer:
         if translation_vector is None:
             return None
         
+        # Convert from mm to m
         return translation_vector[0, 0]/1000
 
 

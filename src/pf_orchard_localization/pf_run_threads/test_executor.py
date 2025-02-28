@@ -17,6 +17,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 def check_tests_aborted(func):
+    """Decorator that skips function execution if tests have been aborted.
+    Args:
+        func (Callable): The function to wrap.
+    Returns:
+        Callable: Wrapped function that checks for aborted state before execution.
+    """
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         if self.tests_aborted:
@@ -25,8 +31,9 @@ def check_tests_aborted(func):
     return wrapper
 
 class TestExecutorQt(QThread):
-    """
-    A class for running the particle filter tests in the qt app on a separate thread
+    """Thread class for executing particle filter tests in the Qt application.
+    Manages test execution, evaluation, and reporting for performance assessment
+    of the particle filter algorithm across different scenarios.
     """
     pf_run_message = pyqtSignal(str)
     set_img_number_label = pyqtSignal(int, int)
@@ -132,13 +139,19 @@ class TestExecutorQt(QThread):
             self.run_all_tests()
 
     
-    def stop_pf(self):
-        """Stop the particle filter gracefully"""
+    def stop_pf(self) -> None:
+        """Stop the particle filter execution gracefully.
+        Sets flags to stop current processing and abort all pending tests.
+        """
         self.pf_active = False
         self.tests_aborted = True
     
-    def run_all_tests(self):
-        """Run all tests in the test regimen"""
+    def run_all_tests(self) -> None:
+        """Run all tests in the test regimen.
+        Executes each test in the test regimen in sequence, marking them
+        as completed upon successful execution. Processes and saves results
+        when all tests are complete.
+        """
         self.tests_aborted = False
 
         self.print_message("Running all tests")
@@ -307,11 +320,13 @@ class TestExecutorQt(QThread):
             self.start_position = self.position_gt
         self.signal_plot_gt_position()
 
-    def handle_image_msg(self, img_data_msg: data_msgs.Image): 
-        """Get the trunk data and odom data from the image message
-
+    def handle_image_msg(self, img_data_msg: data_msgs.Image) -> None: 
+        """Process an image message for trunk detection.
+        Sends the image for trunk detection processing, updates particle filter
+        with detected objects, and updates visualization.
+        
         Args:
-            img_data_msg (data_msgs.Image): The image data message
+            img_data_msg (data_msgs.Image): The image data message to process.
         """
 
         self.processed_img_data_msg = None
@@ -333,8 +348,11 @@ class TestExecutorQt(QThread):
         if self.processed_img_data_msg.object_locations is not None:
             self.check_convergence()
 
-    def wait_for_response(self):
-        """Wait for trunk data and odom data to be received""" 
+    def wait_for_response(self) -> None:
+        """Wait for trunk detection data to be received.
+        Blocks execution until the trunk detection thread signals that
+        processing is complete by setting processed_img_data_msg.
+        """ 
 
         self.img_data_request_mutex.lock()
         if self.processed_img_data_msg is None:
@@ -342,19 +360,21 @@ class TestExecutorQt(QThread):
         self.img_data_request_mutex.unlock()
     
     @pyqtSlot(object)
-    def on_trunk_request_processed(self, img_data_msg: data_msgs.Image):
-        """Slot to receive the trunk data from the trunk data thread
-        
+    def on_trunk_request_processed(self, img_data_msg: data_msgs.Image) -> None:
+        """Slot to receive the trunk detection data from the trunk data thread.
         Args:
-            img_msg_data (data_msgs.Image): The image data message
+            img_data_msg (data_msgs.Image): The image data message with detected objects.
         """
         self.img_data_request_mutex.lock()
         self.processed_img_data_msg = img_data_msg
         self.img_data_request_condition.wakeAll()
         self.img_data_request_mutex.unlock()
     
-    def check_convergence(self):
-        """Check if the particle filter has converged, and set the converged flag"""
+    def check_convergence(self) -> None:
+        """Check if the particle filter has converged.
+        Evaluates if the particle filter has converged to a solution.
+        If converged, stops the active test by setting pf_active to False.
+        """
 
         self.converged = self.pf_engine.check_convergence()
         
@@ -362,14 +382,16 @@ class TestExecutorQt(QThread):
             self.pf_active = False
    
     # TODO redo this to use GPS
-    def check_converged_location(self):
-        """
-        Check if the particle filter has converged to the correct location
-
+    def check_converged_location(self) -> tuple[bool, float, float]:
+        """Check if the particle filter has converged to the correct location.
+        Compares the particle filter's best estimate with ground truth position
+        to determine convergence accuracy and error metrics.
+        
         Returns:
-            correct_convergence (bool): Whether the particle filter converged to the correct location
-            location_error (float): The error in the estimated location
-            distance_treaveled (float): The distance the particle filter traveled before converging
+            tuple[bool, float, float]: A tuple containing:
+                - correct_convergence (bool): Whether convergence is within threshold
+                - location_error (float): Error in meters between estimate and ground truth
+                - distance_traveled (float): Distance in meters from start to ground truth
         """
         position_estimate = self.pf_engine.best_particle[0:2]
 
@@ -397,63 +419,71 @@ class TestExecutorQt(QThread):
     # def signal_done_running_selected_test(self):
     #     self.done_running_selected_test.emit()
     
-    def signal_update_test_number(self, test_name):
-        """Send signal to update the test number in the app
-        
+    def signal_update_test_number(self, test_name: str) -> None:
+        """Send signal to update the test name in the app UI.
         Args:
-            test_name (int): The test number"""
+            test_name (str): The name of the current test.
+        """
         self.update_test_number.emit(test_name)
     
-    def signal_set_time_line(self):
-        """Send signal to set the time line in the app
-
-        Args:
-            current_time (float): The current time
+    def signal_set_time_line(self) -> None:
+        """Send signal to update the timeline position in the app UI.
+        Emits the current relative time from the data manager.
         """
         self.set_time_line.emit(self.data_manager.get_time_relative_to_start())
        
-    def signal_update_trial_number(self, trial_num):
-        """Send signal to update the trial number in the app
-
+    def signal_update_trial_number(self, trial_num: int) -> None:
+        """Send signal to update the trial number in the app UI.
         Args:
-            trial_num (int): The trial number
+            trial_num (int): The current trial number.
         """
         self.update_trial_number.emit(trial_num)
     
-    def signal_plot_gt_position(self):
-        """Send signal to plot the ground truth position in the app"""
+    def signal_plot_gt_position(self) -> None:
+        """Send signal to plot the ground truth position in the app UI.
+        Emits the current ground truth position for visualization.
+        """
         if self.position_gt is None:
             self.print_message("No ground truth position data available")
         else:
             self.plot_gt_position.emit(self.position_gt)
     
-    def signal_plot_best_guess(self):
-        """Send signal to plot the best guess in the app"""
+    def signal_plot_best_guess(self) -> None:
+        """Send signal to plot the best particle estimate in the app UI.
+        Emits the current best particle position for visualization.
+        """
         self.plot_best_guess.emit(self.pf_engine.best_particle)
     
-    def signal_plot_particles(self):
-        """Send signal to plot the particles in the app"""
+    def signal_plot_particles(self) -> None:
+        """Send signal to plot the particle distribution in the app UI.
+        Emits a downsampled set of particles for visualization.
+        """
         particles = self.pf_engine.downsample_particles()
         self.plot_particles.emit(particles)
 
-    def signal_update_image_number(self):
-        """Send signal to update the image number in the app"""
+    def signal_update_image_number(self) -> None:
+        """Send signal to update the image position counter in the app UI.
+        Emits the current image position and total image count.
+        """
         current_image_position = self.data_manager.current_img_position
         num_img_msgs = self.data_manager.num_img_msgs
         self.set_img_number_label.emit(current_image_position, num_img_msgs)
     
-    def signal_update_trial_info(self):
-        """Send signal to update the trial info in the app"""
+    def signal_update_trial_info(self) -> None:
+        """Send signal to update the trial progress information in the app UI.
+        Emits the elapsed time and current particle count.
+        """
         particle_count = self.pf_engine.particles.shape[0]
         current_time = time.time() - self.trial_start_time
         self.update_trial_info.emit(current_time, particle_count)
     
     @check_tests_aborted
-    def signal_update_ui_with_trial_results(self, test_info: PfTest):
-        """Send signal to update the ui with the trial results
-
+    def signal_update_ui_with_trial_results(self, test_info: PfTest) -> None:
+        """Send signal to update the UI with the trial results.
+        Currently a placeholder for future UI updates with test results.
+        
         Args:
-            test_info (PfTest): The test information
+            test_info (PfTest): The test information containing results.
         """
         pass
         # trial_convergence_rate, trial_avg_time_all, trial_avg_time_converged, _, _ = test_info.get_results()

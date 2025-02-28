@@ -7,14 +7,14 @@ import os
 
 @dataclass
 class Parameters:
-    """
-    Base class for parameters. The parameters class is used to store the parameters for the different parts of the system.
-    The parameters can be loaded from a yaml file, saved to a yaml file, and logged.
+    """Base class for parameters.
+    
+    Stores parameters for different parts of the system. Parameters can be loaded from a yaml file, 
+    saved to a yaml file, and logged.
     """
 
-    def load_from_yaml(self, file_path):
-        """
-        Load the parameters from a yaml file
+    def load_from_yaml(self, file_path: str) -> None:
+        """Load the parameters from a yaml file.
         
         Args:
             file_path (str): The path to the yaml file
@@ -38,9 +38,8 @@ class Parameters:
 
         self.log_settings()
 
-    def save_to_yaml(self, file_path):
-        """
-        Save the parameters to a yaml file
+    def save_to_yaml(self, file_path: str) -> None:
+        """Save the parameters to a yaml file.
 
         Args:
             file_path (str): The path to the yaml file
@@ -50,19 +49,15 @@ class Parameters:
         with open(file_path, 'w') as file:
             yaml.dump(asdict(self), file)
 
-    def log_settings(self):
-        """
-        Log the current settings
-        """
+    def log_settings(self) -> None:
+        """Log the current parameter settings."""
         logging.debug("Current settings:")
         for field in fields(self):
             logging.debug(f"{field.name}: {getattr(self, field.name)}")
 
 @dataclass
 class ParametersPf(Parameters):
-    """
-    Parameters for the particle filter
-    """
+    """Parameters for the particle filter."""
     
     start_pose_center_x: float = None
     start_pose_center_y: float = None
@@ -101,9 +96,8 @@ class ParametersPf(Parameters):
     stop_when_converged: bool = None
 
     @property
-    def num_particles(self):
-        """
-        Calculate the number of particles based on the particle density and the start width and height
+    def num_particles(self) -> int:
+        """Calculate the number of particles based on density and area.
         
         Returns:
             int: The number of particles
@@ -112,9 +106,7 @@ class ParametersPf(Parameters):
 
 @dataclass
 class ParametersCachedData(Parameters):
-    """
-    Parameters for the cached data version of the app
-    """
+    """Parameters for the cached data version of the app."""
     data_file_dir: str = None
     cached_image_dir: str = None
     test_start_info_path: str = None
@@ -130,9 +122,7 @@ class ParametersCachedData(Parameters):
 
 @dataclass
 class ParametersBagData(Parameters):
-    """
-    Parameters for the bag data version of the app
-    """
+    """Parameters for the bag data version of the app."""
 
     data_file_dir: str = None
     depth_topic: str = None
@@ -156,9 +146,7 @@ class ParametersBagData(Parameters):
 
 @dataclass
 class ParametersLiveData(Parameters):
-    """
-    Parameters for the live data version of the app
-    """
+    """Parameters for the live data version of the app."""
     depth_topic: str = None
     rgb_topic: str = None
     orientation_topic: str = None
@@ -179,9 +167,8 @@ class ParametersLiveData(Parameters):
         self.check_and_set_to_env_var("gnss_corrected_topic", "GNSS_CORRECTED_TOPIC")
         self.check_and_set_to_env_var("gnss_uncorrected_topic", "GNSS_UNCORRECTED_TOPIC")
 
-    def check_and_set_to_env_var(self, field_name, env_var):
-        """
-        Check if the field is None and set it to the environment variable if it exists
+    def check_and_set_to_env_var(self, field_name: str, env_var: str) -> None:
+        """Check if field is None and set it to the environment variable if it exists.
         
         Args:
             field_name (str): The name of the field

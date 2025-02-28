@@ -14,8 +14,14 @@ from std_srvs.srv import Trigger
 import os
 
 class RealSenseProcessor(Node):
+    """ROS2 node for processing camera images and publishing optical flow odometry data.
+    
+    Subscribes to depth and RGB image topics, synchronizes them, and estimates
+    odometry using optical flow techniques.
+    """
 
     def __init__(self):
+        """Initialize the RealSenseProcessor node with subscribers, publishers and services."""
         super().__init__('of_odom_processor')
         
         self.depth_queue = deque()
@@ -43,17 +49,37 @@ class RealSenseProcessor(Node):
         
         self.optical_flow_estimator = OpticalFlowOdometer()
         
-    def reset_optical_flow_callback(self, req=None, res=None):
+    def reset_optical_flow_callback(self, req=None, res=None) -> Trigger.Response:
+        """Service callback to reset the optical flow odometer.
+        
+        Args:
+            req: The service request (unused)
+            res: The service response (unused)
+            
+        Returns:
+            Trigger.Response: Success response
+        """
         self.optical_flow_estimator = OpticalFlowOdometer()
                 
         return Trigger.Response(success=True, message='Optical flow odometer reset')
 
-    def callback(self, depth_msg, rgb_msg):
+    def callback(self, depth_msg: Image, rgb_msg: Image) -> None:
+        """Message filter callback for synchronized depth and RGB images.
+        
+        Args:
+            depth_msg (Image): Depth image from camera
+            rgb_msg (Image): RGB image from camera
+        """
         self.depth_queue.append(depth_msg)
         self.rgb_queue.append(rgb_msg)
 
 
-    def process_images(self):
+    def process_images(self) -> None:
+        """Timer callback to process queued images.
+        
+        Takes synchronized depth and RGB images from queues and processes them
+        to estimate odometry if available.
+        """
         if self.depth_queue and self.rgb_queue:
             if self.processing_images:
                 self.get_logger().warn('Images are still being processed. Skipping this iteration. Also, wtf 14636')
@@ -91,7 +117,13 @@ class RealSenseProcessor(Node):
     #             self.depth_queue.popleft()
     #             self.rgb_queue.popleft()
 
-    def do_work(self, depth_msg, rgb_msg):
+    def do_work(self, depth_msg: Image, rgb_msg: Image) -> None:
+        """Process depth and RGB images to estimate and publish odometry.
+        
+        Args:
+            depth_msg (Image): Depth image message
+            rgb_msg (Image): RGB image message
+        """
         try:
             depth_img = self.cv_bridge.imgmsg_to_cv2(depth_msg, desired_encoding='passthrough')
             rgb_img = self.cv_bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
@@ -109,7 +141,19 @@ class RealSenseProcessor(Node):
             
         
 class OpticalFlowOdometer:
+    """Estimates camera motion using optical flow between consecutive RGB-D frames.
+    
+    Uses SIFT feature matching combined with depth information to calculate
+    camera motion between frames.
+    """
+    
     def __init__(self, intrinsic_matrix=None, scale=0.5):
+        """Initialize the optical flow odometer.
+        
+        Args:
+            intrinsic_matrix: Camera intrinsic matrix (optional)
+            scale: Scale factor for image downsampling (default: 0.5)
+        """
         self.sift = cv2.SIFT_create()
 
         if intrinsic_matrix is None:
@@ -126,11 +170,29 @@ class OpticalFlowOdometer:
         self.descriptors_previous = None
         self.depth_image_previous = None
 
-    def filter_depth_image(self, depth_img):
+    def filter_depth_image(self, depth_img: np.ndarray) -> np.ndarray:
+        """Apply median filter to depth image to reduce noise.
+        
+        Args:
+            depth_img (np.ndarray): Input depth image
+            
+        Returns:
+            np.ndarray: Filtered depth image
+        """
         return median_filter(depth_img, size=5)
 
-    def get_matched_keypoints(self, rgb_img, depth_img):
-        # get keypoints and descriptors
+    def get_matched_keypoints(self, rgb_img: np.ndarray, depth_img: np.ndarray):
+        """Find and match keypoints between current and previous RGB-D images.
+        
+        Args:
+            rgb_img (np.ndarray): Current RGB image
+            depth_img (np.ndarray): Current depth image
+            
+        Returns:
+            tuple: Containing (points_previous_img_3d, points_current_img_2d) or (None, None)
+                if this is the first image or no good matches were found
+        """
+        # Get keypoints and descriptors
         keypoints_2D, descriptors = self.sift.detectAndCompute(rgb_img, None)
         
         if self.keypoints_previous is None or self.descriptors_previous is None or self.depth_image_previous is None:
@@ -179,7 +241,17 @@ class OpticalFlowOdometer:
 
         return points_previous_img_3d, points_current_img_2d
 
-    def get_movement_estimate(self, rgb_img, depth_img):
+    def get_movement_estimate(self, rgb_img: np.ndarray, depth_img: np.ndarray):
+        """Estimate camera movement between consecutive RGB-D frames.
+        
+        Args:
+            rgb_img (np.ndarray): Current RGB image
+            depth_img (np.ndarray): Current depth image
+            
+        Returns:
+            tuple: (translation_vector, rotation_vector) or (None, None) if movement
+                couldn't be estimated
+        """
         rgb_img = cv2.resize(rgb_img, (int(rgb_img.shape[1] * self.scale), int(rgb_img.shape[0] * self.scale)))
         depth_img = cv2.resize(depth_img, (int(depth_img.shape[1] * self.scale), int(depth_img.shape[0] * self.scale)))
 
@@ -209,15 +281,31 @@ class OpticalFlowOdometer:
 
         return translation_vector, rotation_vector
     
-    def get_odom_estimate(self, rgb_img: np.ndarray, depth_img: np.ndarray):
+    def get_odom_estimate(self, rgb_img: np.ndarray, depth_img: np.ndarray) -> float:
+        """Estimate linear displacement in the forward direction.
+        
+        Args:
+            rgb_img (np.ndarray): Current RGB image
+            depth_img (np.ndarray): Current depth image
+            
+        Returns:
+            float: Linear displacement in meters in the forward direction (X axis),
+                or None if estimation failed
+        """
         translation_vector, rotation_vector = self.get_movement_estimate(rgb_img, depth_img)
         
         if translation_vector is None:
             return None
         
+        # Convert from mm to m
         return translation_vector[0, 0]/1000
 
 def main(args=None):
+    """Main function to initialize and run the ROS node.
+    
+    Args:
+        args: Command line arguments passed to the ROS node
+    """
     rclpy.init(args=args)
     realsense_processor = RealSenseProcessor()
     rclpy.spin(realsense_processor)

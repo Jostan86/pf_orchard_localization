@@ -16,10 +16,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Cached(app_managers.Base):
-    """
-    Application class for the particle filter localization app using cached data, where the 'cached data' is the results
-    from the trunk segmenter and analyzer saved to disk, to avoid having to run the trunk segmenter and analyzer repeatedly
-    on the same data when testing the particle filter.
+    """Application class for particle filter with pre-processed cached data.
+    
+    Uses cached results from the trunk segmenter and analyzer that were previously
+    saved to disk. This avoids having to re-run the trunk processing when testing
+    the particle filter with the same input data multiple times.
     """
     
     def __init__(self, config_file_path):
@@ -32,29 +33,29 @@ class Cached(app_managers.Base):
         # if not os.path.isfile(self.parameters_data.test_start_info_path):
         #     raise FileNotFoundError("Invalid test_start_info_path given in config file")
             
-    def init_data_parameters(self):
-        """Initialize the data parameters"""
+    def init_data_parameters(self) -> None:
+        """Initialize parameters for cached data mode."""
 
         self.parameters_data = ParametersCachedData()
     
-    def init_loaded_data(self):
-        """Initialize the loaded data"""
+    def init_loaded_data(self) -> None:
+        """Load initial data file if not in test mode."""
 
         if self.active_mode == self.pf_tests_mode:
             return
 
         self.data_file_controls.open_data_file(data_file_number=self.parameters_data.initial_data_file_index)
 
-    def setup_trunk_data_connection(self):
-        """Setup the object that connects the app to the trunk segmenter and analyzer"""
+    def setup_trunk_data_connection(self) -> None:
+        """Setup the connection to process cached trunk data."""
 
         self.trunk_data_connection: img_processing_srv.DirectPkgConnection = img_processing_srv.DirectPkgConnection(using_cached_data=True)
         
         self.trunk_data_connection.start()
         self.data_file_controls.set_trunk_data_request_func(self.trunk_data_connection.handle_request)
 
-    def init_widgets_unique(self):
-        """Initialize the widgets unique to cached data app"""
+    def init_widgets_unique(self) -> None:
+        """Initialize widgets specific to the cached data application mode."""
 
         self.image_browsing_controls = ImageBrowsingControls()
         self.data_file_controls = DataFileControls(self.parameters_data, using_cached_data=True)
@@ -67,8 +68,8 @@ class Cached(app_managers.Base):
                             self.image_delay_slider, self.cached_data_creator, self.pf_test_controls]
                             #  self.image_delay_slider, self.cached_data_creator, self.pf_test_controls]
     
-    def draw_ui(self):
-        """Draw the user interface for the cached data app"""
+    def draw_ui(self) -> None:
+        """Create and arrange the user interface elements for the cached data application."""
 
         mode_change_button_layout = QHBoxLayout()
         mode_change_button_layout.addWidget(self.mode_selector)
@@ -95,15 +96,15 @@ class Cached(app_managers.Base):
         self.main_layout.addLayout(self.ui_layout)
         self.main_layout.addWidget(self.plotter)
     
-    def connect_slots_unique(self):
-        """Connect the app functions unique to the cached data app"""
+    def connect_slots_unique(self) -> None:
+        """Connect signals and slots specific to the cached data application."""
 
         self.data_file_controls.data_file_controls_message.connect(self.print_message)
         self.data_file_controls.reset_pf.connect(self.reset_pf)
         self.data_file_controls.set_img_number_label.connect(self.image_number_label.set_img_number_label)   
         
-    def init_modes(self):
-        """Initialize the different app modes for the cached data app"""
+    def init_modes(self) -> None:
+        """Initialize the different operation modes available in the cached data application."""
         
         self.pf_tests_mode = app_modes.PfCachedTests(self)
         self.modes.append(self.pf_tests_mode)   

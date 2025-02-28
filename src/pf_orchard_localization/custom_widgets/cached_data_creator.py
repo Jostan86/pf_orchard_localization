@@ -15,15 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class CachedDataCreator(QWidget):
-    """
-    Widget to aid in caching data in the app 
+    """Widget for creating and managing cached data in the application.
     """
     def __init__(self, main_app_manager: 'app_managers.RosBags'):
-        """
-        Initialize the widget
+        """Initializes the data caching widget.
         
         Args:
-            main_app_manager (app_managers.AnyManager): Main app manager
+            main_app_manager (app_managers.RosBags): Main application manager instance
         """
         super().__init__()
 
@@ -109,8 +107,7 @@ class CachedDataCreator(QWidget):
 
     @pyqtSlot()
     def change_save_directory(self):
-        """
-        Slot for the changing the save directory for the cached data when the button is clicked
+        """Opens a directory selection dialog to set the save location for cached data.
         """
         save_location = QFileDialog.getExistingDirectory(self, "Select Save Location") + "/"
         self.save_directory_input.setText(save_location)
@@ -118,19 +115,19 @@ class CachedDataCreator(QWidget):
 
     @pyqtSlot()
     def reset_cache(self):
-        """
-        Slot for resetting the cache when the button is clicked
+        """Clears all cached data and resets the cache size display.
         """
         self.cache = []
         self.cache_size_label.setText("Cache Size: 0 messages")
     
     @pyqtSlot(object)
     def cache_data(self, data_msg: data_msgs.AnyDataMsg):
-        """
-        Slot for caching data when it's received
+        """Adds received data to the cache if caching is enabled.
+        
+        Also handles storing images if the image saving option is enabled.
         
         Args:
-            msg (dict): The message to cache
+            data_msg (data_msgs.AnyDataMsg): Data message to cache
         """
         if not self.cache_data_enabled:
             logger.warning("Cache data is not enabled")
@@ -144,8 +141,9 @@ class CachedDataCreator(QWidget):
 
     @pyqtSlot()
     def save_cache(self):
-        """
-        Slot for saving the cache when the button is clicked. Does some check to ensure the save location is valid
+        """Saves cached data to a JSON file.
+        
+        Performs validation checks on save location and filename, and handles file overwrite confirmation.
         """
         if len(self.cache) == 0:
             self.main_app_manager.print_message("No data to save")
@@ -184,12 +182,12 @@ class CachedDataCreator(QWidget):
         self.main_app_manager.print_message("Cache saved to: " + save_location)
 
     def save_image(self, img_msg: data_msgs.Image):
-        """
-        Save an image to the save location
+        """Saves an image from a data message to the selected directory.
+        
+        Creates an 'images' subdirectory if needed and names files using message timestamps.
 
         Args:
-            img (np.array): Image to save
-            timestamp (float): Time stamp of the image
+            img_msg (data_msgs.Image): Image message containing image data to save
         """
 
         save_directory = self.save_directory_input.text()
@@ -215,8 +213,9 @@ class CachedDataCreator(QWidget):
 
     @pyqtSlot()
     def cache_data_checkbox_changed(self):
-        """
-        Slot for when the cache data checkbox is changed
+        """Handles state changes for the cache enabling checkbox.
+        
+        Enables or disables the caching functionality and UI controls.
         """
         if self.enable_checkbox.isChecked():
             self.cache_data_enabled = True
@@ -227,11 +226,10 @@ class CachedDataCreator(QWidget):
             self.set_input_disabled(True)
 
     def set_input_disabled(self, disabled):
-        """
-        Set the input to disabled or not
+        """Enables or disables all UI controls related to caching.
 
         Args:
-            disabled (bool): True to disable input, False to enable
+            disabled (bool): True to disable all inputs, False to enable them
         """
         self.save_images_checkbox.setDisabled(disabled)
         self.save_directory_input.setDisabled(disabled)

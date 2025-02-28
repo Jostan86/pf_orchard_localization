@@ -6,10 +6,25 @@ from typing import Callable, List, Tuple, Dict
 
 
 class PfTest:
-    """Class to store and process information for a single test"""
+    """Class to store and process information for a single particle filter test.
+    Manages test parameters, results collection, and statistics generation.
+    """
 
     def __init__(self, test_name: str, start_x: float, start_y: float, start_width: float, start_length: float,
                  start_rotation: float, orientation_center: float, orientation_range: float, data_file_name: str, start_time: float):
+        """Initialize a particle filter test with specific parameters.
+        Args:
+            test_name (str): Name identifier for the test.
+            start_x (float): Starting X position for particles.
+            start_y (float): Starting Y position for particles.
+            start_width (float): Width of initial particle distribution.
+            start_length (float): Length of initial particle distribution.
+            start_rotation (float): Starting rotation for particles (in radians).
+            orientation_center (float): Center heading for particle orientation distribution.
+            orientation_range (float): Range of headings for particle orientation distribution.
+            data_file_name (str): Data file used for this test.
+            start_time (float): Timestamp in the data file to start the test.
+        """
         self.test_name = test_name
         self.start_x, self.start_y = start_x, start_y
         self.start_width, self.start_length = start_width, start_length
@@ -20,23 +35,34 @@ class PfTest:
 
         self.reset_results()
 
-    def __repr__(self):
-        """Returns a string representation of the test data"""
+    def __repr__(self) -> str:
+        """Returns a string representation of the test data.
+        Returns:
+            str: Formatted string with test parameters.
+        """
         return (f"Test Name: {self.test_name}, Start X: {self.start_x}, Start Y: {self.start_y}, "
                 f"Start Width: {self.start_width}, Start Length: {self.start_length}, Start Rotation: {self.start_rotation}, "
                 f"Orientation Center: {self.orientation_center}, Orientation Range: {self.orientation_range}, "
                 f"Data File Name: {self.data_file_name}, Start Time: {self.start_time}")
 
-    def reset_results(self):
-        """Reset the results for the test"""
+    def reset_results(self) -> None:
+        """Reset all test results storage lists to empty state.
+        Clears all stored trial data and marks test as incomplete.
+        """
         self.test_completed = False
         self.results_location_errors = []
         self.results_distances_traveled = []
         self.results_convergence_accuracy = []
         self.results_run_times = []
 
-    def add_results(self, run_time: float, correct_convergence: bool, location_error: float, distance_traveled: float):
-        """Add the results of a trial to the test"""
+    def add_results(self, run_time: float, correct_convergence: bool, location_error: float, distance_traveled: float) -> None:
+        """Add the results of a single trial to the test data collection.
+        Args:
+            run_time (float): Execution time of the test in seconds.
+            correct_convergence (bool): Whether the particle filter correctly converged.
+            location_error (float): Final position error in meters.
+            distance_traveled (float): Total distance traveled during test in meters.
+        """
         self.results_location_errors.append(location_error)
         self.results_distances_traveled.append(distance_traveled)
         self.results_convergence_accuracy.append(correct_convergence)
@@ -45,8 +71,11 @@ class PfTest:
         if self.save_file_path:
             self.add_results_to_file()
 
-    def add_results_to_file(self):
-        """Append the latest result to the results file"""
+    def add_results_to_file(self) -> None:
+        """Append the latest test result to the CSV results file.
+        Writes the most recent test trial results to the file specified
+        in save_file_path, with values rounded to 3 decimal places.
+        """
         with open(self.save_file_path, "a", newline='') as f:
             writer = csv.writer(f)
             writer.writerow([
@@ -56,8 +85,21 @@ class PfTest:
                 round(self.results_run_times[-1], 3)
             ])
 
-    def get_results(self):
-        """Calculate test results statistics"""
+    def get_results(self) -> Tuple[float, float, float, float, float, float, float]:
+        """Calculate test results statistics from all trials.
+        Computes summary statistics including convergence rate, average times,
+        and distances for all trials and for successful convergence trials only.
+        
+        Returns:
+            Tuple[float, float, float, float, float, float, float]: Statistics tuple containing:
+                - convergence_rate: Proportion of trials with successful convergence
+                - avg_time_all: Average runtime across all trials
+                - avg_time_converged: Average runtime for successful trials (NaN if none)
+                - std_time_converged: Standard deviation of runtime for successful trials
+                - avg_distance_all: Average distance across all trials
+                - avg_distance_converged: Average distance for successful trials (NaN if none)
+                - std_distance_converged: Standard deviation of distance for successful trials
+        """
         convergences = np.array(self.results_convergence_accuracy, dtype=bool)
         convergence_rate = np.mean(convergences)
 
@@ -75,15 +117,25 @@ class PfTest:
                     avg_distance_all, np.mean(converged_distances), np.std(converged_distances, ddof=1))
         return (convergence_rate, avg_time_all, np.nan, np.nan, avg_distance_all, np.nan, np.nan)
 
-    def set_completed(self):
-        """Mark the test as completed"""
+    def set_completed(self) -> None:
+        """Mark the test as completed.
+        Sets the test_completed flag to True, indicating all trials are finished.
+        """
         self.test_completed = True
 
 
 class PfTestRegimen:
-    """Class to store and process information for a set of tests"""
+    """Class to store and process information for a set of particle filter tests.
+    Manages loading, executing, and analyzing multiple PfTest instances from a CSV file.
+    """
 
     def __init__(self, test_info_file_path: str, print_message_func: Callable[[str], None] = print, save_path_base: str = None):
+        """Initialize a test regimen by loading tests from a CSV file.
+        Args:
+            test_info_file_path (str): Path to the CSV file containing test definitions.
+            print_message_func (Callable[[str], None]): Function to print status messages. Defaults to built-in print.
+            save_path_base (str, optional): Base path for saving results. Defaults to None.
+        """
         self.print_message_func = print_message_func
         self.pf_tests: List[PfTest] = []
         self.save_path_base = save_path_base
@@ -100,8 +152,13 @@ class PfTestRegimen:
         self.num_tests = len(self.pf_tests)
         self.save_path_all = None
 
-    def initialize_save_files(self, save_path_base: str):
-        """Initialize result files with headers"""
+    def initialize_save_files(self, save_path_base: str) -> None:
+        """Initialize result CSV files with appropriate headers.
+        Creates timestamped result files and sets up file paths for all tests.
+        
+        Args:
+            save_path_base (str): Base path/name for the result files (without extension).
+        """
         self.save_path_base = save_path_base.rstrip(".csv")
         timestamp = time.strftime("%Y-%m-%d--%H-%M-%S")
         self.save_path_all = f"{self.save_path_base}_{timestamp}_all.csv"
@@ -113,8 +170,11 @@ class PfTestRegimen:
         for test in self.pf_tests:
             test.save_file_path = self.save_path_all
 
-    def process_results(self):
-        """Process results and save summarized statistics"""
+    def process_results(self) -> None:
+        """Process test results and save summarized statistics to CSV file.
+        Calculates overall averages across all completed tests and writes
+        comprehensive statistics to the average results file.
+        """
         completed_tests = [test for test in self.pf_tests if test.test_completed]
         if not completed_tests:
             self.print_message_func("No completed tests to process.")
@@ -145,13 +205,18 @@ class PfTestRegimen:
         self.print_message_func(f"Overall Avg Convergence Rate: {overall_avg_convergence_rate}")
         self.print_message_func(f"Overall Avg Distance Converged: {overall_avg_distance_converged}")
 
-    def reset_tests(self):
-        """Reset all tests"""
+    def reset_tests(self) -> None:
+        """Reset all tests in the regimen.
+        Clears results for every test in the collection.
+        """
         for test in self.pf_tests:
             test.reset_results()
 
-    def reset_test(self, test_num: int):
-        """Reset a specific test"""
+    def reset_test(self, test_num: int) -> None:
+        """Reset a specific test by index.
+        Args:
+            test_num (int): Index of the test to reset.
+        """
         if 0 <= test_num < len(self.pf_tests):
             self.pf_tests[test_num].reset_results()
 
@@ -167,8 +232,12 @@ class PfTestResultsProcessor:
         self.avg_file_path = all_file_path.replace("_all.csv", "_avg.csv")
         self.test_data: Dict[str, List[Tuple[float, float, bool, float]]] = defaultdict(list)
 
-    def load_data(self):
-        """Loads data from the 'all' CSV file and stores it in a dictionary grouped by test name."""
+    def load_data(self) -> None:
+        """Loads data from the 'all' CSV file and stores it in a dictionary.
+        Reads the raw trial results CSV and organizes them by test name.
+        Each test's data is stored as a list of tuples containing the
+        metrics for individual trials.
+        """
         with open(self.all_file_path, newline='') as f:
             reader = csv.DictReader(f)
             for row in reader:
@@ -183,8 +252,17 @@ class PfTestResultsProcessor:
                 except ValueError as e:
                     print(f"Skipping row due to error: {e}")
 
-    def compute_statistics(self):
-        """Computes summary statistics for each test and writes to an 'avg' CSV file."""
+    def compute_statistics(self) -> None:
+        """Computes summary statistics for each test and writes to an 'avg' CSV file.
+        Analyzes the test data to calculate:
+        - Convergence rates
+        - Average run times (all trials and successful trials)
+        - Standard deviations of run times for successful trials
+        - Average distances (all trials and successful trials)
+        - Standard deviations of distances for successful trials
+        
+        Results are written to a new CSV file with the '_avg' suffix.
+        """
         with open(self.avg_file_path, "w", newline='') as f:
             writer = csv.writer(f)
             writer.writerow(["Test Name", "Convergence Rate", "Average Time", "Average Time (Converged)", 
@@ -223,15 +301,19 @@ class PfTestResultsProcessor:
 
         print(f"Summary written to: {self.avg_file_path}")
 
-    def process(self):
-        """Runs the full processing pipeline."""
+    def process(self) -> None:
+        """Runs the full processing pipeline.
+        Loads data from the raw CSV file and generates the summary statistics.
+        """
         self.load_data()
         self.compute_statistics()
 
 
-def calculate_overall_stats(avg_file_path: str):
+def calculate_overall_stats(avg_file_path: str) -> None:
     """Computes overall test statistics from an 'avg' file and appends the results.
-
+    Reads an existing average results file, calculates summary statistics across
+    all tests, and appends these overall metrics to the end of the file.
+    
     Args:
         avg_file_path (str): Path to the 'avg' CSV file.
     """

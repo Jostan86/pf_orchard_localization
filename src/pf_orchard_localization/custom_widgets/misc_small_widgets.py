@@ -21,11 +21,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 class PfChangeParametersButton(QWidget):
-    """
-    Widget for changing the particle filter parameters
+    """Widget for changing particle filter parameters via dialog.
     """
 
     def __init__(self, main_app_manager: 'app_managers.AnyManager'):
+        """Initializes the parameter change button widget.
+        
+        Args:
+            main_app_manager (app_managers.AnyManager): Main application manager
+        """
         super().__init__()
 
         self.main_app_manager = main_app_manager
@@ -43,8 +47,9 @@ class PfChangeParametersButton(QWidget):
         self.adjust_pf_settings_button.clicked.connect(self.adjust_pf_settings)
 
     def adjust_pf_settings(self):
-        """
-        Adjust the particle filter settings
+        """Opens a dialog to adjust particle filter parameters.
+        
+        Checks if particle filter is active before allowing changes.
         """
             
         pf_active = self.main_app_manager.get_pf_active()
@@ -77,14 +82,18 @@ class PfChangeParametersButton(QWidget):
 
 
 class PfControlButtons(QWidget):
-    """
-    Widget to setup the buttons for controlling the particle filter
+    """Widget with buttons for controlling particle filter execution.
     """
 
     startButtonClicked = pyqtSignal()
     stopButtonClicked = pyqtSignal()
 
     def __init__(self, main_app_manager):
+        """Initializes the particle filter control buttons.
+        
+        Args:
+            main_app_manager: Application manager instance
+        """
         super().__init__()
 
         self.main_app_manager = main_app_manager
@@ -122,18 +131,18 @@ class PfControlButtons(QWidget):
         self.start_stop_button.clicked.connect(self.start_stop_button_clicked)
 
     def set_num_particles(self, num_particles):
-        """
-        Set the number of particles label
+        """Updates the display showing current number of particles.
         
         Args:
-            num_particles (int): Number of particles
+            num_particles (int): Current number of particles in filter
         """
         self.num_particles_label.setText(str(num_particles))
     
     @pyqtSlot()
     def start_stop_button_clicked(self):
-        """
-        Slot for when the start/stop button is clicked
+        """Handles the start/stop button click event.
+        
+        Emits appropriate signal based on current button state.
         """
         if self.start_stop_button.text() == "Start":
             self.startButtonClicked.emit()
@@ -141,26 +150,28 @@ class PfControlButtons(QWidget):
             self.stopButtonClicked.emit()
 
     def set_start(self):
-        """
-        Set the button to 'Start'
+        """Changes button display to 'Start' mode.
         """
         self.start_stop_button.setText("Start")
         self.start_stop_button.setToolTip("Start the particle filter")
 
     def set_stop(self):
-        """
-        Set the button to 'Stop'
+        """Changes button display to 'Stop' mode.
         """
         self.start_stop_button.setText("Stop")
         self.start_stop_button.setToolTip("Stop the particle filter")
 
 
 class PfStartLocationControls(QWidget):
-    """
-    Widget for setting the starting state of the particles
+    """Widget for configuring the particle filter's initial pose and distribution.
     """
 
     def __init__(self, main_app_manager: 'app_managers.AnyManager'):
+        """Initializes the starting location controls widget.
+        
+        Args:
+            main_app_manager (app_managers.AnyManager): Main application manager
+        """
         super().__init__()
 
         self.main_app_manager = main_app_manager
@@ -223,8 +234,7 @@ class PfStartLocationControls(QWidget):
         self.gps_y = None
 
     def set_parameters(self):
-        """
-        Set the parameters from the main app manager
+        """Loads filter parameters from application settings and updates UI.
         """
         pf_settings = self.main_app_manager.get_pf_parameters()
         self.start_x_input.setText(str(pf_settings.start_pose_center_x))
@@ -236,8 +246,9 @@ class PfStartLocationControls(QWidget):
         self.start_height_input.setText(str(pf_settings.start_height))
 
     def get_parameters(self):
-        """
-        Get the parameters from the GUI and (try to) set the main app manager parameters
+        """Retrieves values from UI and updates particle filter parameters.
+        
+        Updates filter settings with user-provided values.
         """
         current_settings = self.main_app_manager.get_pf_parameters()
         current_settings.start_pose_center_x = float(self.start_x_input.text())
@@ -255,15 +266,18 @@ class PfStartLocationControls(QWidget):
 
     @pyqtSlot(dict)
     def set_gps_position(self, gps_data: data_msgs.Gnss):
-        """
-        Set the GPS position from the GPS data
+        """Stores the current GPS position coordinates.
+        
+        Args:
+            gps_data (data_msgs.Gnss): GNSS data message containing position
         """
         self.gps_x = gps_data.map_x
         self.gps_y = gps_data.map_y
 
     def set_start_location_from_gps(self):
-        """
-        Set the start center location to the GPS location
+        """Sets the particle filter's initial position to the current GPS coordinates.
+        
+        Validates GPS data and uses it to initialize particles if available.
         """
 
         if self.gps_x is None or self.gps_y is None:
@@ -278,13 +292,14 @@ class PfStartLocationControls(QWidget):
         self.set_start_location_from_plot_click(self.gps_x, self.gps_y, True)
 
     def set_start_location_from_plot_click(self, x, y, shift_pressed):
-        """
-        Set the start location from a plot click if shift is pressed
+        """Sets initial particle position based on map clicks.
+
+        Only updates position when shift key is pressed during click.
 
         Args:
-            x (float): x coordinate of the click
-            y (float): y coordinate of the click
-            shift_pressed (bool): True if shift is pressed
+            x (float): X coordinate of the click position
+            y (float): Y coordinate of the click position
+            shift_pressed (bool): Whether shift key was held during click
         """
         if self.main_app_manager.get_pf_active():
             return
@@ -301,11 +316,10 @@ class PfStartLocationControls(QWidget):
 
 
     def setReadOnly(self, read_only=True):
-        """
-        Set the widget to read only mode
+        """Sets all input fields to read-only or editable mode.
 
         Args:
-            read_only (bool): True to set the widget to read only, False to set it to read/write
+            read_only (bool): True to make fields read-only, False to make them editable
         """
         self.start_x_input.setReadOnly(read_only)
         self.start_y_input.setReadOnly(read_only)
@@ -317,18 +331,23 @@ class PfStartLocationControls(QWidget):
 
 
 class PfCheckBoxes(QWidget):
-    """
-    Widget for setting the checkboxes for the particle filter app
+    """Widget container for organizing checkboxes in rows.
+    
+    Creates a dynamic grid layout for any number of checkboxes.
     """
 
     def __init__(self):
+        """Initializes the checkbox container widget.
+        """
         super().__init__()
         self.all_checkbox_info = []
         self.num_boxes_per_row = 3
 
     def init_checkboxes(self):
-        """
-        Initialize the checkboxes in the all_checkbox_info list, these must be added externally
+        """Creates and arranges checkboxes in a grid layout.
+        
+        Uses checkbox information from all_checkbox_info list, which must be populated 
+        before calling this method.
         """
 
         num_checkboxes = len(self.all_checkbox_info)
@@ -352,10 +371,11 @@ class PfCheckBoxes(QWidget):
 
 
 class Console(QWidget):
-    """
-    Console widget for displaying messages in the pf app
+    """Text console widget for displaying application messages.
     """
     def __init__(self):
+        """Initializes the console widget with text area and clear button.
+        """
         super().__init__()
 
         self.console = QPlainTextEdit(self)
@@ -371,24 +391,24 @@ class Console(QWidget):
         self.setLayout(self.console_layout)
 
     def __call__(self, message):
-        """
-        Override the call method to print a message
+        """Makes this widget callable to print messages directly.
+        
+        Args:
+            message (str): Message to display in console
         """
         self.print_message(message)
 
     def print_message(self, message):
-        """
-        Print a message to the console by appending it to the end
+        """Appends a message to the console display.
 
         Args:
-            message (str): Message to print
+            message (str): Message text to display
         """
         self.console.appendPlainText(message)
 
 
 class ImageLabel(QLabel):
-    """
-    Label for displaying images
+    """Enhanced QLabel for displaying and scaling images.
     """
     def __init__(self, image_size=(480, 640), scale_factor=1.5):
         

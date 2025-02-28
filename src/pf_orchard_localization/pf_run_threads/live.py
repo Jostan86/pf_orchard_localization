@@ -8,8 +8,10 @@ from ..visual_odom import OpticalFlowOdometerThread
 import os
 
 class Live(QThread):
-    """
-    Runs the particle filter algorithm in real-time using live data from the camera
+    """Thread for running the particle filter with real-time data.
+    
+    Processes live data from camera and odometry sources to update the particle
+    filter state in real-time.
     """
     
     pf_run_message = pyqtSignal(str)
@@ -24,11 +26,12 @@ class Live(QThread):
                  trunk_data_thread, 
                  stop_when_converged=False
                  ):
-        """
+        """Initialize the live particle filter thread.
+        
         Args:
             pf_engine (PfEngine): The particle filter engine
-            trunk_data_thread (TrunkDataConnectionRosSub): The thread that receives the trunk data
-            stop_when_converged (bool, optional): If True, the thread will stop when the particle filter converges. Defaults to False.
+            trunk_data_thread: Thread that receives trunk data from ROS
+            stop_when_converged (bool, optional): If True, thread stops when PF converges
         """
         
         super().__init__()
@@ -56,10 +59,12 @@ class Live(QThread):
         self.converged_signal.connect(self.trunk_data_thread.publish_converged)
         
     
-    def run(self):
-            """
-            The main loop of the thread, stopped by calling stop_pf()
-            """
+    def run(self) -> None:
+        """Main thread loop processing live data for particle filter.
+        
+        Continuously processes incoming odometry and trunk data to update the
+        particle filter state. Can be stopped by calling stop_pf().
+        """
                         
             self.pf_active = True
             
@@ -125,38 +130,36 @@ class Live(QThread):
                 self.converged_signal.emit(self.pf_engine.check_convergence())
                 
     
-    def handle_odom_data(self, odom_data):
-        """
-        Processes the odometry data
+    def handle_odom_data(self, odom_data: dict) -> None:
+        """Process odometry data to update particle filter motion.
         
         Args:
-            odom_data (dict): The odometry data
+            odom_data (dict): Dictionary containing timestamp and linear displacement
         """
         self.pf_engine.motion_update(odom_data["linear_displacment"], angular_velocity=0, timestamp=odom_data["timestamp"], actually_a_position_change=True)
     
-    def handle_tree_image_data(self, tree_image_data):
-        """
-        Processes the tree image data
-
+    def handle_tree_image_data(self, tree_image_data: dict) -> None:
+        """Process tree image data to update particle filter sensor measurements.
+        
         Args:
-            tree_image_data (dict): The tree image data
+            tree_image_data (dict): Dictionary containing trunk data and timestamp
         """
         trunk_data = tree_image_data["trunk_data"]
         self.pf_engine.sensor_update(trunk_data)            
         
-    def check_convergence(self):
-        """
-        Checks if the particle filter has converged, and sets the converged flag
-        """
+    def check_convergence(self) -> None:
+        """Check if the particle filter has converged and handle if needed."""
         self.converged = self.pf_engine.check_convergence()
         
         if self.converged and self.stop_when_converged:
             self.pf_active = False
             
     @pyqtSlot(dict)
-    def trunk_data_reciever(self, tree_image_data):
-        """
-        Slot for receiving the trunk data from the ros thread
+    def trunk_data_reciever(self, tree_image_data: dict) -> None:
+        """Receive trunk data from ROS thread and add to processing queue.
+        
+        Args:
+            tree_image_data (dict): Tree image data from ROS
         """
         self.tree_image_data_mutex.lock()
         self.tree_image_data_queue.append(tree_image_data)
@@ -164,9 +167,11 @@ class Live(QThread):
         self.tree_image_data_mutex.unlock()
     
     @pyqtSlot(dict)
-    def odom_data_reciever(self, odom_data):
-        """
-        Slot for receiving the odometry data from the ros thread
+    def odom_data_reciever(self, odom_data: dict) -> None:
+        """Receive odometry data from ROS thread and add to processing queue.
+        
+        Args:
+            odom_data (dict): Odometry data from ROS
         """
         self.odom_mutex.lock()
         self.odom_data_list.append(odom_data)
@@ -174,10 +179,8 @@ class Live(QThread):
         self.odom_mutex.unlock()
     
     @pyqtSlot()
-    def stop_pf(self):
-        """
-        Stops the thread and stops any waiting
-        """
+    def stop_pf(self) -> None:
+        """Stop the particle filter thread and wake any waiting conditions."""
         self.pf_active = False
     
         self.odom_wait_condition.wakeAll()

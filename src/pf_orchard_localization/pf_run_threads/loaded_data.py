@@ -15,8 +15,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 class RecordedData(QThread):
-    """
-    Thread to run the particle filter algorithm using data from a bag file
+    """Thread for running particle filter with pre-recorded data.
+    
+    Processes data from ROS bag files or cached data sources to update 
+    the particle filter state.
     """
     
     load_next_data_file = pyqtSignal(bool)
@@ -91,9 +93,12 @@ class RecordedData(QThread):
         self.prev_img_msg_timestamp: data_msgs.Timestamp = None
         self.prev_actual_time = time.time()
         
-    def get_new_data_manager(self):
-        """Get a new data manager from the main thread. Tells the main thread to load the next data file then waits for 
-        the data manager to be received."""
+    def get_new_data_manager(self) -> None:
+        """Request a new data manager from the main thread.
+        
+        Signals the main thread to load the next data file and waits 
+        for the new data manager to be received.
+        """
 
         load_first_image = False
         self.load_next_data_file.emit(load_first_image)
@@ -113,8 +118,13 @@ class RecordedData(QThread):
         self.data_manager_mutex.unlock()
         
     @pyqtSlot(bool, object)
-    def data_manager_receiver(self, success, data_manager):
-        """Slot to receive the data manager from the main thread"""
+    def data_manager_receiver(self, success: bool, data_manager) -> None:
+        """Receive the data manager from the main thread.
+        
+        Args:
+            success (bool): Whether the data manager was successfully loaded
+            data_manager: The new data manager instance
+        """
 
         self.data_manager_mutex.lock()
         self.data_manager = data_manager
@@ -122,8 +132,12 @@ class RecordedData(QThread):
         self.data_manager_condition.wakeAll()
         self.data_manager_mutex.unlock()        
             
-    def run(self):
-        """The main loop of the thread, stopped by calling stop_pf()."""
+    def run(self) -> None:
+        """Main execution loop that processes data until stopped.
+        
+        Continuously processes messages from the data manager until 
+        stopped by calling stop_pf().
+        """
         
         self.pf_active = True
         
@@ -133,8 +147,12 @@ class RecordedData(QThread):
             if self.pf_active and self.data_manager.at_img_msg and self.only_single_image:
                 self.pf_active = False
     
-    def send_next_msg(self):
-        """Get the next message from the data manager and process it"""
+    def send_next_msg(self) -> None:
+        """Get and process the next message from the data manager.
+        
+        Retrieves the next message, handles it according to its type, 
+        and updates the particle filter state.
+        """
 
         current_msg = self.data_manager.get_next_msg()
 
@@ -183,8 +201,12 @@ class RecordedData(QThread):
                 pose_estimate_msg = data_msgs.PoseEstimate.from_particle_pose(self.pf_engine.best_particle, msg_timestamp=current_msg.msg_timestamp, bag_timestamp=current_msg.bag_timestamp)
                 self.cache_msg.emit(pose_estimate_msg)
 
-    def wait_for_response(self):
-        """Wait for trunk data and odom data to be received""" 
+    def wait_for_response(self) -> None:
+        """Wait for trunk data and visual odometry data to be received.
+        
+        Blocks until both the processed image data and visual odometry 
+        data (if enabled) are available.
+        """
 
         self.img_data_request_mutex.lock()
         if self.processed_img_data_msg is None:
@@ -199,11 +221,11 @@ class RecordedData(QThread):
             self.odom_mutex.unlock()
     
     @pyqtSlot(object)
-    def on_trunk_request_processed(self, img_data_msg: data_msgs.Image):
-        """Slot to receive the trunk data from the trunk data thread
+    def on_trunk_request_processed(self, img_data_msg: data_msgs.Image) -> None:
+        """Receive processed trunk data from the trunk data thread.
         
         Args:
-            img_msg_data (data_msgs.Image): The image data message
+            img_data_msg (data_msgs.Image): Image data containing trunk detection information
         """
         self.img_data_request_mutex.lock()
         self.processed_img_data_msg = img_data_msg
@@ -211,22 +233,25 @@ class RecordedData(QThread):
         self.img_data_request_mutex.unlock()
     
     @pyqtSlot(object)
-    def on_visual_odom_request_processed(self, odom_msg_data: data_msgs.Odom):
-        """Slot to receive the odom data from the visual odometer thread
+    def on_visual_odom_request_processed(self, odom_msg_data: data_msgs.Odom) -> None:
+        """Receive visual odometry data from the optical flow thread.
 
         Args:
-            odom_msg (dict): A dict with the the estimated x movement in mm from the visual odometer and the image timestamp
+            odom_msg_data (data_msgs.Odom): Odometry data containing estimated motion
         """
         self.odom_mutex.lock()
         self.processed_odom_data_msg = odom_msg_data
         self.odom_condition.wakeAll()
         self.odom_mutex.unlock()
 
-    def handle_image_msg(self, img_data_msg: data_msgs.Image): 
-        """Get the trunk data and odom data from the image message
+    def handle_image_msg(self, img_data_msg: data_msgs.Image) -> None: 
+        """Process image data to get trunk detections and visual odometry.
+
+        Sends the image to the trunk detection thread and visual odometry thread,
+        updates the particle filter with the results, and plots the current state.
 
         Args:
-            img_data_msg (data_msgs.Image): The image data message
+            img_data_msg (data_msgs.Image): Image data message to process
         """
         process_visual_odom = self.use_visual_odom and img_data_msg.source != data_msgs.Source.CACHED
 
@@ -257,8 +282,15 @@ class RecordedData(QThread):
         if self.processed_img_data_msg.object_locations is not None:
             self.check_convergence()
     
-    def handle_delay(self, img_data_msg: data_msgs.Image):
-        """Handle the delay between images. The delay is based on the time between the current image and the previous image."""
+    def handle_delay(self, img_data_msg: data_msgs.Image) -> None:
+        """Insert appropriate delay between image processing.
+        
+        Calculates and applies delay based on the time difference between 
+        consecutive images and the configured time multiplier.
+        
+        Args:
+            img_data_msg (data_msgs.Image): Current image data message
+        """
         
         if self.prev_img_msg_timestamp is not None:
             actual_time_taken = time.time() - self.prev_actual_time
@@ -271,8 +303,12 @@ class RecordedData(QThread):
         self.prev_actual_time = time.time()
         
            
-    def check_convergence(self):
-        """Check if the particle filter has converged, and set the converged flag"""
+    def check_convergence(self) -> None:
+        """Check if the particle filter has converged.
+        
+        Updates the converged flag and stops processing if configured
+        to stop when convergence is detected.
+        """
 
         self.converged = self.pf_engine.check_convergence()
         
@@ -280,8 +316,8 @@ class RecordedData(QThread):
             self.pf_active = False
             
     @pyqtSlot()
-    def stop_pf(self):
-        """Stop the particle filter"""
+    def stop_pf(self) -> None:
+        """Stop the particle filter thread."""
         
         self.pf_active = False
 

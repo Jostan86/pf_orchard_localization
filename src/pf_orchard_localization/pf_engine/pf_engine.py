@@ -25,8 +25,13 @@ class PfEngine:
         self.best_particle: np.ndarray = None
 
     def reset_pf(self, setup_data: ParametersPf) -> None:
-        """
-        Reset the particle filter with the given setup data.
+        """Reset the particle filter with the given setup data.
+        
+        Args:
+            setup_data (ParametersPf): Configuration parameters for the particle filter
+            
+        Returns:
+            None
         """
         self.start_pose_center = np.array([setup_data.start_pose_center_x, setup_data.start_pose_center_y])
         self.start_pose_width = setup_data.start_width
@@ -90,23 +95,22 @@ class PfEngine:
 
         self.histogram = None
     
-    def reset_timestamps(self):
+    def reset_timestamps(self) -> None:
+        """Reset all timestamps and related flags used for tracking motion."""
         self.prev_t_odom = None
         self.odom_zerod = False
         self.orientation_prev = None
         self.orientation_current = None
-        self.orientation_prev_time
+        self.orientation_prev_time = None
 
-    def initialize_particles(self, num_particles: int):
-        """
-        Initialize the particle poses
-
+    def initialize_particles(self, num_particles: int) -> np.ndarray:
+        """Initialize the particle poses.
+        
         Args:
             num_particles (int): The number of particles to initialize with
 
         Returns:
             np.ndarray: An array of shape (num_particles, 3) containing the initial particle poses as (x, y, theta)
-
         """
 
         start_pose_center_x = self.start_pose_center[0]
@@ -175,12 +179,11 @@ class PfEngine:
 
     #     self.motion_update(u, dt_odom, num_readings)
 
-    def motion_update(self, odom_data: data_msgs.Odom):
-        """
-        Propagate the particles forward in time using the motion model.
+    def motion_update(self, odom_data: data_msgs.Odom) -> None:
+        """Propagate the particles forward in time using the motion model.
 
         Args:
-            odom_data (data_msgs.Odom): The odometry data message, either visual or wheel odometry. If it's visual odometry, the linear velocity is expected to 
+            odom_data (data_msgs.Odom): The odometry data message, either visual or wheel odometry
         """
 
         timestamp = odom_data.msg_timestamp.to_sec()
@@ -251,9 +254,11 @@ class PfEngine:
             orientation_delta = self.wrap_angle(orientation_delta)
             print("Orientation diff: ", orientation_delta)  
     
-    def orientation_update(self, imu_msg: data_msgs.Imu):
-        """
-        Handle the IMU message. This will be called every time an IMU message is received.
+    def orientation_update(self, imu_msg: data_msgs.Imu) -> None:
+        """Handle the IMU message. This will be called every time an IMU message is received.
+        
+        Args:
+            imu_msg (data_msgs.Imu): The IMU data message containing orientation information
         """
         if not (self.use_orientation_for_angular_velocity or self.use_orientation_for_particle_weights):
             return
@@ -284,13 +289,14 @@ class PfEngine:
             self.orientation_prev = self.orientation_current
             self.orientation_prev_time = imu_msg.msg_timestamp.to_sec()
 
-    def sensor_update(self, image_data_msg: data_msgs.Image):
-        """
-        Does a sensor update. This will be called every time a tree message is received, updates based on the objects in the message and the
-        orientation from the imu if it is being used.
+    def sensor_update(self, image_data_msg: data_msgs.Image) -> None:
+        """Does a sensor update based on detected objects and IMU orientation.
+        
+        This will be called every time a tree message is received. Updates particle weights
+        based on the objects in the message and the orientation from the IMU if it is being used.
 
         Args:
-            tree_msg (dict): The message containing the sensed tree/post positions and widths
+            image_data_msg (data_msgs.Image): The image data message containing detected object locations and widths
         """
 
         orientation_used_in_weight = False
@@ -328,10 +334,23 @@ class PfEngine:
 
     
     @property
-    def angular_velocity(self):
+    def angular_velocity(self) -> float:
+        """Calculate average angular velocity from stored gyro readings.
+        
+        Returns:
+            float: Mean angular velocity in radians per second
+        """
         return np.mean(self.gyro_readings)
 
     def yaw_from_quaternion(self, imu_msg: data_msgs.Imu) -> float:
+        """Extract yaw angle from quaternion in IMU message.
+        
+        Args:
+            imu_msg (data_msgs.Imu): The IMU message containing orientation as a quaternion
+            
+        Returns:
+            float: The yaw angle in radians
+        """
         x = imu_msg.orientation_x
         y = imu_msg.orientation_y
         z = imu_msg.orientation_z
@@ -341,10 +360,8 @@ class PfEngine:
         yaw_z = np.arctan2(t3, t4)
         return yaw_z
 
-    def resample_particles(self):
-        """
-        Resample the particles according to the particle weights using the low variance sampling algorithm.
-        """
+    def resample_particles(self) -> None:
+        """Resample the particles according to the particle weights using the low variance sampling algorithm."""
 
         # Get the number of particles to resample
         num_particles = self.calculate_num_particles(self.particles)
@@ -390,17 +407,17 @@ class PfEngine:
         self.particle_weights = np.ones(num_particles) / num_particles
 
     def get_object_global_locations(self, particle_states: np.ndarray, object_locations: np.ndarray) -> np.ndarray:
-        """
-        Calculates the location of the given objects in the global frame for each particle by transforming the object
-        locations in the particle frames to the global frame.
+        """Calculate the location of objects in the global frame for each particle.
+        
+        Transforms the object locations from the particle frames to the global frame.
 
         Args:
             particle_states (np.ndarray): An array of shape (n, 3) containing the states of the particles
-            object_locations (np.ndarray): An array of shape (n, 2) containing the locations of the objects seen by the robot
+            object_locations (np.ndarray): An array of shape (m, 2) containing the locations of the objects seen by the robot
 
         Returns:
             np.ndarray: A MxNx2 numpy array, with x and y coordinates for each object relative to each particle. Here n
-            is the number of particles and m is the number of trees.
+                      is the number of particles and m is the number of trees.
         """
 
         # Calculate sin and cos of particle angles
@@ -417,15 +434,14 @@ class PfEngine:
         return object_global_location
 
     def object_local_polar_transform(self, particle_states: np.ndarray, object_locs: np.ndarray) -> np.ndarray:
-        """
-        Calculates an array of the object's location in the local frame.
+        """Calculate object locations in local polar coordinates relative to particles.
 
         Args:
             particle_states (np.ndarray): An array of shape (n, 3) containing the states of the particles
-            object_locs (np.ndarray): An array of shape (n, 2) containing the locations of the objects seen by the robot
+            object_locs (np.ndarray): An array of shape (n, 2) containing the locations of the objects
 
         Returns:
-            np.ndarray: A Nx2 numpy array, with r and theta coordinates for each object relative to each particle.
+            np.ndarray: A Nx2 numpy array, with r and theta coordinates for each object relative to each particle
         """
         # Calculate differences in x and y coordinates
         dx = object_locs[:, 0] - particle_states[:, 0]
@@ -443,18 +459,18 @@ class PfEngine:
         return polar_coords
     
     def particle_weight_update_tree(self, particle_states: np.ndarray, sensed_tree_coords: np.ndarray, widths_sensed: np.ndarray, positions_sensed: np.ndarray) -> np.ndarray:
-        """
-        Calculate the weights of the particles based on the sensed tree locations and widths.
+        """Calculate particle weights based on sensed tree locations and widths.
 
         Args:
-            particle_states (np.ndarray): An array of shape (n, 3) containing the states of the particles
-            sensed_tree_coords (np.ndarray): An array of shape (m, n, 2) containing the locations of the trees in the global frame for each particle. m is the
-                                             number of trees and n is the number of particles.
-            widths_sensed (np.ndarray): An array containing the widths of the trees.
-            positions_sensed (np.ndarray): An array of shape (m, 2) containing the locations of the trees in the robot frame.
+            particle_states (np.ndarray): Array of shape (n, 3) containing the states of the particles
+            sensed_tree_coords (np.ndarray): Array of shape (m, n, 2) containing the locations of the trees 
+                                           in the global frame for each particle, where m is the number 
+                                           of trees and n is the number of particles
+            widths_sensed (np.ndarray): Array containing the widths of the trees
+            positions_sensed (np.ndarray): Array of shape (m, 2) containing the locations of the trees in the robot frame
         
         Returns:
-            np.ndarray: An array of shape (n,) containing the weights of the particles.
+            np.ndarray: Array of shape (n,) containing the weights of the particles
         """
         # Initialize scores
         scores = np.ones(particle_states.shape[0], dtype=float)
@@ -494,15 +510,14 @@ class PfEngine:
         return scores
     
     def particle_weight_update_orientation(self, particle_states: np.ndarray, orientation_sensed: np.ndarray) -> np.ndarray:
-        """
-        Calculate the weights of the particles based on the sensed orientation.
+        """Calculate particle weights based on the sensed orientation.
 
         Args:
-            particle_states (np.ndarray): An array of shape (n, 3) containing the states of the particles
-            orientation_sensed (np.ndarray): An array of shape (m, n) containing the sensed orientations for each particle.
+            particle_states (np.ndarray): Array of shape (n, 3) containing the states of the particles
+            orientation_sensed (np.ndarray): Array containing the sensed orientation
         
         Returns:
-            np.ndarray: An array of shape (n,) containing the weights of the particles.
+            np.ndarray: Array of shape (n,) containing the weights of the particles
         """
 
         # Calculate the difference between the sensed orientation and the particle orientation
@@ -514,44 +529,43 @@ class PfEngine:
         return prob_orientation
     
     def wrap_angle(self, angle: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """
-        Wrap an angle to be between -pi and pi.
+        """Wrap an angle to be between -pi and pi.
 
         Args:
-            angle (float): The angle to wrap
+            angle (Union[float, np.ndarray]): The angle(s) to wrap
 
         Returns:
-            float: The wrapped angle
+            Union[float, np.ndarray]: The wrapped angle(s)
         """
         return (angle + np.pi) % (2 * np.pi) - np.pi
 
     def probability_of_values(self, measurement_discrepancy: np.ndarray, std_dev: float) -> np.ndarray:
-        """
-        Find the probability of each particle using a normal distribution given the discrepancy between the expected sensor value and the actual sensor value,
-        for each particle, as well as the expected standard deviation.
+        """Calculate probabilities using normal distribution based on measurement discrepancies.
+        
+        Finds the probability of each particle using a normal distribution given the discrepancy
+        between the expected sensor value and the actual sensor value, and the standard deviation.
         
         Args:
-            measurement_discrepancy (np.ndarray): The array of values  
-            std_dev (float): The standard deviation
+            measurement_discrepancy (np.ndarray): Array of differences between expected and actual values
+            std_dev (float): Standard deviation of the measurement
 
         Returns:
-            np.ndarray: The probability of each value in the array
+            np.ndarray: Probability of each value in the array
         """
 
         norm_pdf = (1 / (std_dev * np.sqrt(2 * np.pi))) * np.exp(-measurement_discrepancy ** 2 / (2 * std_dev ** 2))
         return norm_pdf
 
     def rotate_around_point(self, particles: np.ndarray, angle_rad: float, center_point: tuple) -> np.ndarray:
-        """
-        Rotate numpy array points (in the first two columns) around a given point by a given angle in degrees.
+        """Rotate points around a given center point by a given angle.
 
         Args:
-            particles (np.ndarray): numpy array where first two columns are x and y coordinates
-            angle_rad (float): angle to rotate in radians
-            center_point (tuple): tuple of (x, y) coordinates of rotation center
+            particles (np.ndarray): Array where first two columns are x and y coordinates
+            angle_rad (float): Angle to rotate in radians
+            center_point (tuple): Tuple of (x, y) coordinates of rotation center
         
         Returns:
-            np.ndarray: Rotated numpy array
+            np.ndarray: Rotated array of particles
         """
 
         # Rotation matrix
@@ -578,8 +592,7 @@ class PfEngine:
         return particles
 
     def xy_to_polar(self, xy_coords: np.ndarray) -> np.ndarray:
-        """
-        Convert an array of xy coordinates to polar coordinates.
+        """Convert an array of xy coordinates to polar coordinates.
 
         Args:
             xy_coords (np.ndarray): Array of shape (n, 2) with columns (x, y)
@@ -598,14 +611,13 @@ class PfEngine:
         return polar_coords
 
     def calculate_num_particles(self, particles: np.ndarray) -> int:
-        """
-        Calculate the number of particles to use based on KLD-sampling.
+        """Calculate the optimal number of particles to use based on KLD-sampling.
 
         Args:
-            particles (np.array): Array of shape (num_particles, 3) with columns (x, y, theta).
+            particles (np.ndarray): Array of shape (num_particles, 3) with columns (x, y, theta)
         
         Returns:
-            int: Number of particles for the next timestep.
+            int: Number of particles for the next timestep
         """
         # Create 2-dimensional grid of bins
         x_bins = np.arange(particles[:, 0].min(), particles[:, 0].max() + self.bin_size, self.bin_size)
@@ -635,12 +647,14 @@ class PfEngine:
 
         return int(np.ceil(n))
 
-    def check_convergence(self):
-        """
-        Check if the particles have converged to a single cluster using the histogram created for kld sampling.
+    def check_convergence(self) -> bool:
+        """Check if the particles have converged to a single cluster.
+        
+        Uses the histogram created for KLD sampling to determine if particles have converged
+        to a single cluster of appropriate size.
         
         Returns:
-            bool: True if the particles have converged, False otherwise.
+            bool: True if the particles have converged, False otherwise
         """
 
         hist = self.histogram
@@ -682,14 +696,13 @@ class PfEngine:
             return False
 
     def downsample_particles(self, max_samples: int = 10000) -> np.ndarray:
-        """
-        Downsample a 2D array of particles to a maximum number of samples.
+        """Downsample particles to a maximum number of samples.
 
         Args:
-            max_samples (int): The maximum number of samples to downsample to.
+            max_samples (int): The maximum number of samples to downsample to
 
         Returns:
-            np.ndarray: Downsampled 2D numpy array of particles.
+            np.ndarray: Downsampled array of particles
         """
         num_particles = self.particles.shape[0]
         if num_particles <= max_samples:

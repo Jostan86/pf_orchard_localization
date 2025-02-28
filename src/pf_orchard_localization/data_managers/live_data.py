@@ -21,12 +21,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Ros2Sub(QThread):
-    """Extends the TrunkDataConnection class to connect to get the trunk data from a ROS subscriber. Used for the live mode of the app"""
+    """ROS2 subscriber for receiving live trunk data.
+    
+    Connects to various ROS topics to receive trunk data, images, odometry, and GNSS data
+    for the live mode of the application.
+    """
 
     def __init__(self, data_parameters: ParametersLiveData):
-        """
+        """Initialize the ROS2 subscriber.
+        
         Args:
-            data_parameters (ParametersLiveData): The parameters for the live data version of the app
+            data_parameters (ParametersLiveData): Parameters for the live data version of the app
         """
         super().__init__()
         self.node = None
@@ -37,9 +42,11 @@ class Ros2Sub(QThread):
 
     def init_ros_node(self):
     # overrides Ros2Service
-    def run(self):
-        """
-        Overrides the run method to instead initialize the ROS node and the subscribers and begin waiting for messages
+    def run(self) -> None:
+        """Start ROS node and initialize all subscribers.
+        
+        Overrides QThread's run method to initialize the ROS node, create all required
+        subscribers, and begin the ROS event loop.
         """
         rclpy.init()
         self.node = Node('pyqt5_subscriber_node')
@@ -88,15 +95,14 @@ class Ros2Sub(QThread):
         while rclpy.ok():
             rclpy.spin_once(self.node)
         
-    def convert_to_decimal(self, dmm):
-        """
-        Converts the degrees minutes minutes format to decimal degrees
+    def convert_to_decimal(self, dmm: float) -> float:
+        """Convert degrees-minutes-minutes format to decimal degrees.
         
         Args:
-            dmm (float): The degrees minutes minutes format
+            dmm: GPS coordinate in degrees-minutes format (e.g., 4710.8635)
             
         Returns:
-            float: The decimal degrees
+            Decimal degrees (e.g., 47.1811)
         """
         dmm = float(dmm)
         degrees = int(dmm // 100)
@@ -105,22 +111,29 @@ class Ros2Sub(QThread):
         return decimal_degrees
         
 
-    def gnss_uncorrected_callback(self, msg: NavSatFix):
-        """Callback for the uncorrected GNSS data"""
+    def gnss_uncorrected_callback(self, msg: NavSatFix) -> None:
+        """Process uncorrected GNSS data from ROS topic.
+        
+        Args:
+            msg (NavSatFix): NavSatFix message containing raw GNSS data
+        """
         gnss_msg = data_msgs.Gnss.from_rosbags_msg(msg, corrected=False)
         self.uncorrected_gnss_data_signal.emit(gnss_msg)
     
-    def gnss_corrected_callback(self, msg):
-        """Callback for the corrected GNSS data"""
+    def gnss_corrected_callback(self, msg: NavSatFix) -> None:
+        """Process corrected GNSS data from ROS topic.
+        
+        Args:
+            msg (NavSatFix): NavSatFix message containing corrected GNSS data
+        """
         gnss_msg = data_msgs.Gnss.from_rosbags_msg(msg, corrected=True)
         self.corrected_gnss_data_signal.emit(gnss_msg)
 
-    def tree_image_data_callback(self, tree_image_data):
-        """
-        Callback for the tree image data, packages the data and emits a signal with the data
-
+    def tree_image_data_callback(self, tree_image_data: TreeImageData) -> None:
+        """Process tree image data and emit a signal with the processed data.
+        
         Args:
-            tree_image_data (TreeImageData): The tree image data message
+            tree_image_data (TreeImageData): Tree image data from ROS topic
         """
             
         tree_positions, widths, class_estimates, seg_img = self.tree_image_msg_2_trunk_data(tree_image_data)
@@ -133,33 +146,29 @@ class Ros2Sub(QThread):
         tree_image_data = {"timestamp": timestamp, "trunk_data": trunk_data, "seg_img": seg_img}
         self.trunk_data_signal.emit(tree_image_data)
     
-    def rgb_img_msg_callback(self, rgb_img_msg):
-        """
-        Callback for the RGB image data, emits a signal with the RGB image data
-
+    def rgb_img_msg_callback(self, rgb_img_msg: Image) -> None:
+        """Process RGB image message and emit signal with the image.
+        
         Args:
-            rgb_img_msg (Image): The RGB image message
+            rgb_img_msg (Image): RGB image message from ROS topic
         """
 
         
         rgb_image = self.bridge.imgmsg_to_cv2(rgb_img_msg, desired_encoding="bgr8")
         self.signal_original_image.emit(rgb_image, self.original_image_display_num)
     
-    def odom_data_callback(self, odom_data):
-        """
-        Callback for the optical flow odometry data, emits a signal with the odometry data
-
+    def odom_data_callback(self, odom_data: StampedFloat) -> None:
+        """Process optical flow odometry data and emit signal.
+        
         Args:
-            odom_data (StampedFloat): The odometry data message
+            odom_data (StampedFloat): Odometry data message from ROS topic
         """
         timestamp = odom_data.header.stamp.sec + odom_data.header.stamp.nanosec * 1e-9
         odom_data = {"timestamp": timestamp, "linear_displacment": odom_data.data}
         self.odom_data_signal.emit(odom_data)
     
-    def reset_optical_flow(self):
-        """
-        Resets the optical flow odometry
-        """
+    def reset_optical_flow(self) -> None:
+        """Reset the optical flow odometry by calling ROS service."""
         future = self.reset_optical_flow_client.call_async(Trigger.Request())
         rclpy.spin_until_future_complete(self.node, future)
         if future.result() is not None:
@@ -169,16 +178,16 @@ class Ros2Sub(QThread):
                 self.signal_print_message.emit("Could not reset optical flow odometer")
     
     @pyqtSlot(bool)
-    def publish_converged(self, converged):
-        """
-        Slot to publish a message indicating if the particle filter has converged
-
+    def publish_converged(self, converged: bool) -> None:
+        """Publish a ROS message indicating if the particle filter has converged.
+        
         Args:
-            converged (bool): If True, the particle filter has converged
+            converged (bool): True if the particle filter has converged
         """
         msg = Bool()
         msg.data = converged
         self.converged_pub.publish(msg)
                 
-    def stop(self):
+    def stop(self) -> None:
+        """Shutdown the ROS node."""
         rclpy.shutdown()

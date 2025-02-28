@@ -19,14 +19,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Base(ABC):
-    """Base class for the particle filter localization app, contains the main structure of the app. Inherited by the
-    PfAppBags, PfAppCached, and PfAppLive classes which are the specific implementations of the app for the different
-    use cases.
+    """Base class for the particle filter localization app.
+    
+    Contains the main structure of the app. Inherited by the PfAppBags, PfAppCached, 
+    and PfAppLive classes which are specific implementations for different use cases.
     """
     
     def __init__(self, config_file_path: str):
-        """
-        Initialize the app
+        """Initialize the app.
 
         Args:
             config_file_path (str): Path to the configuration file
@@ -71,8 +71,8 @@ class Base(ABC):
 
         self.init_loaded_data()     
 
-    def init_main_window(self):
-        """Initializes the window display settings"""
+    def init_main_window(self) -> None:
+        """Initialize the window display settings."""
 
         self.main_window = QMainWindow()
         self.main_window.setWindowTitle("Orchard Particle Filter Localization App")
@@ -101,27 +101,27 @@ class Base(ABC):
 
 
     @abstractmethod
-    def init_data_parameters(self):
-        """Initialize the data parameters"""
+    def init_data_parameters(self) -> None:
+        """Initialize the data parameters."""
         pass
 
     @abstractmethod
-    def init_loaded_data(self):
-        """Initialize the loaded data"""
+    def init_loaded_data(self) -> None:
+        """Initialize the loaded data."""
         pass
     
     @abstractmethod
-    def init_modes(self):
-        """Initialize the different app modes"""
+    def init_modes(self) -> None:
+        """Initialize the different app modes."""
         pass
     
     @abstractmethod
-    def draw_ui(self):
-        """Draw the user interface"""
+    def draw_ui(self) -> None:
+        """Draw the user interface."""
         pass
 
-    def init_widgets(self):
-        """Initialize all the widgets used in the app"""
+    def init_widgets(self) -> None:
+        """Initialize all the widgets used in the app."""
 
         self.widget_list: List[QWidget] = []
 
@@ -158,12 +158,12 @@ class Base(ABC):
                             self.mode_selector, self.control_buttons, self.image_display, self.console, self.plotter,]
 
     @abstractmethod
-    def init_widgets_unique(self):
-        """Initialize the widgets unique to the app type"""
+    def init_widgets_unique(self) -> None:
+        """Initialize the widgets unique to the app type."""
         pass
 
-    def connect_slots(self):
-        """Connect the UI elements to the app functions"""
+    def connect_slots(self) -> None:
+        """Connect the UI elements to the app functions."""
 
         self.control_buttons.reset_button.clicked.connect(lambda x: self.reset_pf(use_ui_parameters=True))
 
@@ -188,41 +188,42 @@ class Base(ABC):
         self.connect_slots_unique()
 
     @abstractmethod
-    def connect_slots_unique(self):
-        """Connect the app functions unique to the app type"""
+    def connect_slots_unique(self) -> None:
+        """Connect the app functions unique to the app type."""
         pass
 
     @abstractmethod
-    def setup_trunk_data_connection(self):
-        """Setup the object that connects the app to the trunk segmenter and analyzer"""
+    def setup_trunk_data_connection(self) -> None:
+        """Setup the connection to the trunk segmenter and analyzer."""
         pass
     
-    def image_display_checkbox_changed(self, checkbox_states: dict = None):
+    def image_display_checkbox_changed(self, checkbox_states: dict = None) -> None:
+        """Update the image display when checkboxes change.
         
+        Args:
+            checkbox_states (dict, optional): States of the checkboxes
+        """
         # Update the image display with the current image if there is one
         if self.data_file_controls.data_manager is not None:
             # request = {"current_msg": self.data_file_controls.data_manager.current_msg, "for_display_only": True}
             self.trunk_data_connection.handle_request(self.data_file_controls.data_manager.current_msg)
 
-    def include_width_changed(self):
-        """Change the include width parameter in the particle filter parameters according to the checkbox"""
-
+    def include_width_changed(self) -> None:
+        """Update the include width parameter based on the checkbox state."""
         self.parameters_pf.include_width = self.checkboxes.include_width_checkbox.isChecked()
 
-    def stop_when_converged_changed(self):
-        """Change the stop when converged parameter in the particle filter parameters according to the checkbox"""
-
+    def stop_when_converged_changed(self) -> None:
+        """Update the stop when converged parameter based on the checkbox state."""
         self.parameters_pf.stop_when_converged = self.checkboxes.stop_when_converged_checkbox.isChecked()
     
-    def hide_all_widgets(self):
-        """Hide all the widgets in the app"""
-
+    def hide_all_widgets(self) -> None:
+        """Hide all widgets in the app."""
         for widget in self.widget_list:
             if widget is not None:
-                widget.hide()           
+                widget.hide()
                 
-    def mode_changed(self):
-        """Change the active mode based on the mode selector"""
+    def mode_changed(self) -> None:
+        """Change the active mode based on the current mode selector value."""
         # Find the active mode and deactivate it
         for mode in self.modes:
             if mode.mode_active:
@@ -237,11 +238,11 @@ class Base(ABC):
                 self.active_mode = mode
                 break
 
-    def reset_pf(self, use_ui_parameters=True):
+    def reset_pf(self, use_ui_parameters: bool = True) -> None:
         """Reset the particle filter.
 
         Args:
-            use_ui_parameters (bool): Whether to use the parameters set in the UI or the parameters set in the app
+            use_ui_parameters (bool): Whether to use parameters from UI or from app settings
         """
         if use_ui_parameters:
             self.start_location_controls.get_parameters()
@@ -252,15 +253,19 @@ class Base(ABC):
 
         self.reset_gui()
 
-    def reset_gui(self):
-        """Reset the particle filter elements in the GUI"""
+    def reset_gui(self) -> None:
+        """Reset the particle filter elements in the GUI."""
 
         self.control_buttons.set_num_particles(self.pf_engine.particles.shape[0])
         self.plotter.update_particles(self.pf_engine.downsample_particles())
         self.plotter.update_position_estimate(None)
 
-    def get_pf_active(self):
-        """Get whether the particle filter is currently active"""
+    def get_pf_active(self) -> bool:
+        """Check if the particle filter is currently active.
+        
+        Returns:
+            bool: True if the particle filter is active, False otherwise
+        """
 
         if self.active_mode is not None:
             if hasattr(self.active_mode, "pf_continuous_active"):
@@ -268,16 +273,23 @@ class Base(ABC):
         
         return False
 
-    def get_pf_parameters(self):
-        """Get the particle filter parameters"""
+    def get_pf_parameters(self) -> ParametersPf:
+        """Get the particle filter parameters.
+        
+        Returns:
+            ParametersPf: The current particle filter parameters
+        """
 
         return self.parameters_pf
 
-    def set_pf_parameters(self, parameters: ParametersPf):
-        """Set the particle filter parameters
+    def set_pf_parameters(self, parameters: ParametersPf) -> bool:
+        """Set the particle filter parameters.
 
         Args:
-            parameters (ParametersPf): Particle filter parameters
+            parameters (ParametersPf): New particle filter parameters
+            
+        Returns:
+            bool: True if parameters were set successfully, False otherwise
         """
 
         if self.get_pf_active():
@@ -286,11 +298,11 @@ class Base(ABC):
         self.parameters_pf = parameters
         return True
 
-    def print_message(self, message: str):
-        """Print a message to the console
+    def print_message(self, message: Union[str, list]) -> None:
+        """Print a message to the console.
 
         Args:
-            message (str): Message to print
+            message (Union[str, list]): Message or list of messages to print
         """
 
         if isinstance(message, list):
@@ -299,14 +311,19 @@ class Base(ABC):
         else:
             self.console(message)
 
-    def display_pf_settings(self):
-        """Display the current particle filter settings"""
+    def display_pf_settings(self) -> None:
+        """Display the current particle filter settings in the console."""
 
         for field in fields(self.parameters_pf):
             value = getattr(self.parameters_pf, field.name)
             self.print_message(field.name + ": " + str(value))
 
-    def closeEvent(self, event):
+    def closeEvent(self, event) -> None:
+        """Handle the window close event.
+        
+        Args:
+            event: The close event
+        """
         for mode in self.modes:
             if mode.mode_active:
                 mode.shutdown_hook()

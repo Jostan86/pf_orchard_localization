@@ -7,9 +7,10 @@ from ..utils.pf_evaluation import PfTestRegimen
 from ..utils.parameters import ParametersCachedData
 
 class PfTestControls(QWidget):
-    """
-    A widget that allows the user to control the particle filter tests, which run a series of tests to evaluate the
-    performance of the particle filter. Used to try out different parameters and see how they affect the filter.
+    """Widget for running and controlling particle filter evaluation tests.
+    
+    Provides controls for running test regimens that evaluate particle filter performance
+    with different parameters and configurations.
     """
     runAllTestsClicked = pyqtSignal()
     abortAllTestsClicked = pyqtSignal()

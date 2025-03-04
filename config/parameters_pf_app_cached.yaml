@@ -5,6 +5,8 @@
 initial_data_time: 0  # seconds into the bag file
 initial_data_file_index: 0  # index of the bag file
 
+# Whether to automatically load the next bag file when the current one is finished, helpful if files are split
+auto_load_next_file: False
 
 # ----------------------
 # Jazz apple orchard - Oct. 2024
@@ -12,18 +14,9 @@ initial_data_file_index: 0  # index of the bag file
 use_visual_odom: False
 
 ## Docker ##
-# pf_config_file_path: /home/vscode/pf_orchard_localization/config/parameters_pf.yaml
-# map_data_path: /home/vscode/app_data/map_data_jazz_new.json
-# data_file_dir: /home/vscode/app_data/pf_cached_data/pf_data/
-# cached_image_dir: /home/vscode/app_data/pf_cached_data/images
-# test_start_info_path: /home/vscode/app_data/test_starts2.csv
-
-## Local ##
-pf_config_file_path: /home/jostan/OneDrive/Docs/Grad_school/Research/code_projects/pf_orchard_localization/config/parameters_pf.yaml
-map_data_path: /media/jostan/Portabits/pf_app_data/map_data_jazz_new.json
-# data_file_dir: /home/jostan/Documents/test_data/
-# cached_image_dir: /home/jostan/Documents/test_data/images
-test_start_info_path: /media/jostan/Portabits/pf_app_data/test_starts4.csv
-data_file_dir: /home/jostan/Documents/2023-Oct-Cached_data/
-cached_image_dir: /home/jostan/Documents/2023-Oct-Cached_data/images
-test_results_save_path: /home/jostan/Documents/2023-Oct-Cached_data/results/test_results.csv
+pf_config_file_path: /home/vscode/my_python_packages/pf_orchard_localization/config/parameters_pf.yaml
+map_data_path: /home/vscode/package_data/pf_orchard_localization_data/map_data_jazz_new.json
+data_file_dir: /home/vscode/package_data/pf_orchard_localization_data/cached_data/
+cached_image_dir: /home/vscode/package_data/pf_orchard_localization_data/cached_data/images
+test_start_info_path: /home/vscode/package_data/pf_orchard_localization_data/cached_data/test_starts5.csv
+test_results_save_path: /home/vscode/package_data/pf_orchard_localization_data/cached_data/results

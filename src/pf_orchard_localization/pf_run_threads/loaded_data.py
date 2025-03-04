@@ -4,6 +4,8 @@ import numpy as np
 from pf_orchard_localization.pf_engine import PfEngine
 from pf_orchard_localization.visual_odom import OpticalFlowOdometerThread
 from pf_orchard_localization.data_managers import data_msgs
+from pf_orchard_localization.utils.parameters import ParametersCachedData, ParametersBagData
+
 from typing import Union, TYPE_CHECKING
 import time
 
@@ -36,10 +38,10 @@ class RecordedData(QThread):
                  pf_engine: PfEngine, 
                  data_manager: Union['data_managers.Ros2Bag', 'data_managers.Cached'],
                  trunk_data_thread: Union['img_processing_srv.DirectPkgConnection', 'img_processing_srv.Ros2Service'],
+                 data_parameters: Union[ParametersBagData, ParametersCachedData],
                  stop_when_converged: bool,
                  only_single_image: bool,
                  time_delay_multiplier: float,
-                 use_visual_odom: bool=False,
                  cache_data_enabled: bool=False,
                  using_cached_data: bool=False):
         """
@@ -47,10 +49,10 @@ class RecordedData(QThread):
             pf_engine (PfEngine): The particle filter engine
             data_manager (recorded_data_loaders.Ros2Bag or .Cached): The data manager that loads and manages the data from the bag file
             trunk_data_thread (trunk_data_connection.DirectPkgConnection or .Ros2Service): The thread that handles getting the trunk data
+            data_parameters (ParametersBagData or ParametersCachedData): The parameters for the data
             stop_when_converged (bool): If True, the thread will stop when the particle filter converges
             only_single_image (bool): If True, the thread will only process a single image then exit
             time_delay_multiplier (float): The amount of added time to wait between processing images
-            use_visual_odom (bool, optional): If True, the thread will use visual odometry. Defaults to False.
             cache_data_enabled (bool, optional): If True, the thread will cache the data. Defaults to False.
             using_cached_data (bool, optional): If True, the thread will use cached data. Defaults to False.
         """
@@ -61,10 +63,10 @@ class RecordedData(QThread):
         self.data_manager = data_manager
         self.cache_data_enabled = cache_data_enabled
         self.trunk_data_thread = trunk_data_thread
+        self.data_parameters = data_parameters
         self.stop_when_converged = stop_when_converged
         self.only_single_image = only_single_image
         self.time_delay_multiplier = time_delay_multiplier
-        self.use_visual_odom = use_visual_odom
         self.using_cached_data = using_cached_data
 
         self.trunk_data_thread.signal_request_processed.connect(self.on_trunk_request_processed)
@@ -73,7 +75,7 @@ class RecordedData(QThread):
         self.processed_odom_data_msg: data_msgs.Odom = None
         self.image_idx = 0
         
-        if self.use_visual_odom and not self.using_cached_data:
+        if self.data_parameters.use_visual_odom and not self.using_cached_data:
             self.visual_odom_thread = OpticalFlowOdometerThread()
             self.visual_odom_thread.start()
             self.visual_odom_thread.signal_request_processed.connect(self.on_visual_odom_request_processed)
@@ -158,10 +160,9 @@ class RecordedData(QThread):
 
         # The data manager returns None if it is at the end of the data
         if current_msg is None:
-            
-            # Cached data files should all be entirely contained in one file, so if we reach the end of the messages, we can stop
-            if self.using_cached_data:
-                self.pf_run_message.emit("Reached end of cached data. Stopping particle filter.")
+
+            if not self.data_parameters.auto_load_next_file:
+                self.pf_run_message.emit("Reached end of data. Stopping particle filter.")
                 self.pf_active = False
                 return
 
@@ -174,10 +175,10 @@ class RecordedData(QThread):
 
         self.set_time_line.emit(self.data_manager.get_time_relative_to_start())
 
-        if current_msg.message_type == data_msgs.MsgType.WHEEL_ODOM and not self.use_visual_odom:
+        if current_msg.message_type == data_msgs.MsgType.WHEEL_ODOM and not self.data_parameters.use_visual_odom:
             logger.debug(f"Sending wheel odom message to pf_engine. msg timestamp: {current_msg.msg_timestamp}, bag timestamp: {current_msg.bag_timestamp}")
             self.pf_engine.motion_update(current_msg)
-        elif current_msg.message_type == data_msgs.MsgType.VISUAL_ODOM and self.use_visual_odom:
+        elif current_msg.message_type == data_msgs.MsgType.VISUAL_ODOM and self.data_parameters.use_visual_odom:
             logger.debug(f"Sending visual odom message to pf_engine. msg timestamp: {current_msg.msg_timestamp}, bag timestamp: {current_msg.bag_timestamp}")
             self.pf_engine.motion_update(current_msg)
         elif current_msg.message_type == data_msgs.MsgType.IMAGE:
@@ -213,7 +214,7 @@ class RecordedData(QThread):
             self.img_data_request_condition.wait(self.img_data_request_mutex)
         self.img_data_request_mutex.unlock()
         
-        if self.use_visual_odom and not self.using_cached_data:
+        if self.data_parameters.use_visual_odom and not self.using_cached_data:
             # Trunk data is in, now wait for odom data if it is not already in
             self.odom_mutex.lock()
             if self.processed_odom_data_msg is None:
@@ -253,7 +254,7 @@ class RecordedData(QThread):
         Args:
             img_data_msg (data_msgs.Image): Image data message to process
         """
-        process_visual_odom = self.use_visual_odom and img_data_msg.source != data_msgs.Source.CACHED
+        process_visual_odom = self.data_parameters.use_visual_odom and img_data_msg.source != data_msgs.Source.CACHED
 
         self.processed_img_data_msg = None
         self.processed_odom_data_msg = None

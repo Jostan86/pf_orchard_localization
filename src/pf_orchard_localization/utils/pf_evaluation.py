@@ -71,6 +71,7 @@ class PfTest:
         if self.save_file_path:
             self.add_results_to_file()
 
+    
     def add_results_to_file(self) -> None:
         """Append the latest test result to the CSV results file.
         Writes the most recent test trial results to the file specified
@@ -113,9 +114,17 @@ class PfTest:
             converged_times = run_times[convergences]
             converged_distances = distances[convergences]
 
-            return (convergence_rate, avg_time_all, np.mean(converged_times), np.std(converged_times, ddof=1),
-                    avg_distance_all, np.mean(converged_distances), np.std(converged_distances, ddof=1))
+            if np.sum(convergences) > 1:
+                std_converged_times = np.std(converged_times, ddof=1)
+                std_converged_distances = np.std(converged_distances, ddof=1)
+            else:
+                std_converged_times = np.nan
+                std_converged_distances = np.nan
+
+            return (convergence_rate, avg_time_all, np.mean(converged_times), std_converged_times,
+                    avg_distance_all, np.mean(converged_distances), std_converged_distances)
         return (convergence_rate, avg_time_all, np.nan, np.nan, avg_distance_all, np.nan, np.nan)
+
 
     def set_completed(self) -> None:
         """Mark the test as completed.
@@ -367,7 +376,7 @@ def calculate_overall_stats(avg_file_path: str) -> None:
     print(f"Overall stats appended to {avg_file_path}")
 
 if __name__ == "__main__":
-    processor = PfTestResultsProcessor("/home/jostan/Documents/2023-Oct-Cached_data/results/test_results_2025-02-18--15-01-51_all.csv")
+    processor = PfTestResultsProcessor("/home/jostan/Documents/2024-Oct-Cached_data/results/test_results_2025-02-18--15-01-51_all.csv")
     processor.process()
 
-    calculate_overall_stats("/home/jostan/Documents/2023-Oct-Cached_data/results/test_results_2025-02-18--15-01-51_avg.csv")
+    calculate_overall_stats("/home/jostan/Documents/2024-Oct-Cached_data/results/test_results_2025-02-18--15-01-51_avg.csv")

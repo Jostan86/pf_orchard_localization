@@ -100,10 +100,10 @@ class PfRecordedData(QObject):
         self.pf_thread = pf_run_threads.RecordedData(pf_engine=self.main_app_manager.pf_engine,
                                      data_manager=self.main_app_manager.data_file_controls.data_manager,
                                      trunk_data_thread=self.main_app_manager.trunk_data_connection,
+                                     data_parameters=self.main_app_manager.parameters_data,
                                      stop_when_converged=self.main_app_manager.parameters_pf.stop_when_converged,
                                      only_single_image=single_image,
                                      time_delay_multiplier=self.main_app_manager.image_delay_slider.get_multiplier_value(),
-                                     use_visual_odom=self.main_app_manager.parameters_data.use_visual_odom,
                                      cache_data_enabled=self.main_app_manager.cached_data_creator.cache_data_enabled,
                                      using_cached_data=self.using_cached_data)
         

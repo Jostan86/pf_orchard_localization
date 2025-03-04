@@ -28,6 +28,8 @@ RUN sudo usermod --append --groups video $USERNAME
 RUN sudo apt-get update && \
     sudo apt-get install -y --no-install-recommends\
     git \
+    curl \
+    unzip \
     python3-pyqt5 \
     python3-pip \
     libxcb-cursor0 && \
@@ -88,15 +90,31 @@ RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 RUN echo "source ${ROS_WS_ROOT}/install/setup.bash" >> ~/.bashrc
 
 
-
 ### ------------------- ###
 # Stuff added for 'contained' version
 ### ------------------- ###
-# Install trunk width estimation package, add version so that cache is invalidated when the version changes
-ADD https://api.github.com/repos/Jostan86/trunk_width_estimation/git/refs/heads/main /home/vscode/.trunk_width_estimation_version.json
-RUN git clone https://github.com/Jostan86/trunk_width_estimation.git ~/my_python_packages/trunk_width_estimation
-RUN pip install ~/my_python_packages/trunk_width_estimation
+ENV WIDTH_ESTIMATION_PACKAGE_PATH=/home/${USERNAME}/my_python_packages/trunk_width_estimation
+ENV WIDTH_ESTIMATION_PACKAGE_DATA_PATH=/home/${USERNAME}/package_data/trunk_width_estimation_data
 
+RUN mkdir -p ${WIDTH_ESTIMATION_PACKAGE_DATA_PATH}
+
+# Install trunk width estimation package, add version so that cache is invalidated when the version changes
+ADD https://api.github.com/repos/Jostan86/trunk_width_estimation/git/refs/heads/main ${WIDTH_ESTIMATION_PACKAGE_DATA_PATH}/.trunk_width_estimation_version.json
+RUN git clone https://github.com/Jostan86/trunk_width_estimation.git ${WIDTH_ESTIMATION_PACKAGE_PATH}
+RUN pip install ${WIDTH_ESTIMATION_PACKAGE_PATH}
+
+# Download and unzip the data files
+# Made links using instructions here: https://askubuntu.com/a/1211122
+RUN curl -L "https://ivzkiw.bn.files.1drv.com/y4mDYz1RspetmfTiR6rwGZEAwpX9CTuxylqPxaC7cjgM0GRtMjdNNVPgpXThrFl5E83DQLQOZ7aYHZE8_utaQVjE8uMxtffzVmmpJWbzSlMnhuDsa9uCWWbjjaDvpvYIoEtYtBjYeEYrzOTkNbmPeCMN9-dlEtOxl_Ply5SUR66ixiWgU-Zm5AS7F23ecdpQkaExYU0kINte1nQIkL5tcUKEQ" \
+    -o /tmp/main_data.zip\ 
+    && unzip /tmp/main_data.zip -d ${WIDTH_ESTIMATION_PACKAGE_DATA_PATH} \
+    && rm /tmp/main_data.zip
+RUN curl -L "https://vmolxg.bn.files.1drv.com/y4mXpgogvrdIKNFt8NhRk8103kQ1D1LAwyK6I_oHI0HNIRx7eEaRPYO5kgu1t-gY_LlHGvuvQR0c1Xao002DNMohItm_SC0eyq8VgnmXW00fHqmCe5vNmKMpC5OlFe9Grnq9TutXeiEtlM5Uh_nDSHejkt7LqgK4MLHvIzwWtVZqFkSDq9iqMW9qDMddUODj1UkvgUEm0-cbBx6i4XQeNZWwA" \
+    -o /tmp/analysis_data.zip \ 
+    && unzip /tmp/analysis_data.zip -d ${WIDTH_ESTIMATION_PACKAGE_DATA_PATH} \
+    && rm /tmp/analysis_data.zip
+
+# Install the dependencies
 RUN sudo apt-get update \
     && sudo apt-get install -y \
     # python3-opencv \
@@ -127,7 +145,8 @@ RUN pip install numpy==1.26.4
 # Update all packages
 RUN sudo apt update && sudo apt upgrade -y && sudo rm -rf /var/lib/apt/lists/*
 
-RUN echo "export WIDTH_ESTIMATION_PACKAGE_PATH=/home/vscode/my_python_packages/trunk_width_estimation" >> ~/.bashrc
+# RUN echo "export WIDTH_ESTIMATION_PACKAGE_PATH=/home/vscode/my_python_packages/trunk_width_estimation" >> ~/.bashrc
+
 ### ------------------- ###
 ### ------------------- ###
 
@@ -139,11 +158,8 @@ ENV REMOTE_CONTAINERS_DISPLAY_SOCK=/tmp/.X11-unix/X0
 ENV XDG_RUNTIME_DIR=/tmp/runtime-${USERNAME}
 
 # Copy the package into the container and install it
-ENV WORKSPACE_ROOT=/home/${USERNAME}/pf_orchard_localization
+ENV WORKSPACE_ROOT=/home/${USERNAME}/my_python_packages/pf_orchard_localization
 COPY --chown=${USERNAME}:${USERNAME} . ${WORKSPACE_ROOT}
 RUN pip install -e ${WORKSPACE_ROOT}
-
-
-
 
 USER root

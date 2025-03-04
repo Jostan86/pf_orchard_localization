@@ -25,13 +25,6 @@ class Cached(app_managers.Base):
     
     def __init__(self, config_file_path):
         super().__init__(config_file_path)
-        
-        # check if it's a file
-        # if self.parameters_data.test_start_info_path is None:
-        #     raise FileNotFoundError("No test_start_info_path given in config file")     
-              
-        # if not os.path.isfile(self.parameters_data.test_start_info_path):
-        #     raise FileNotFoundError("Invalid test_start_info_path given in config file")
             
     def init_data_parameters(self) -> None:
         """Initialize parameters for cached data mode."""
@@ -105,14 +98,12 @@ class Cached(app_managers.Base):
         
     def init_modes(self) -> None:
         """Initialize the different operation modes available in the cached data application."""
-        
-        self.pf_tests_mode = app_modes.PfCachedTests(self)
-        self.modes.append(self.pf_tests_mode)   
 
         self.pf_mode = app_modes.PfCached(self)
         self.modes.append(self.pf_mode)
-        
-             
+
+        self.pf_tests_mode = app_modes.PfCachedTests(self)
+        self.modes.append(self.pf_tests_mode)   
         
         self.playback_mode = app_modes.ImagePlayback(self)
         self.modes.append(self.playback_mode)

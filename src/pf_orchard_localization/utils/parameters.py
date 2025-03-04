@@ -120,6 +120,8 @@ class ParametersCachedData(Parameters):
 
     use_visual_odom: bool = False
 
+    auto_load_next_file: bool = False
+
 @dataclass
 class ParametersBagData(Parameters):
     """Parameters for the bag data version of the app."""
@@ -133,6 +135,8 @@ class ParametersBagData(Parameters):
     gnss_uncorrected_topic: str = None
     initial_data_time: float = None
     initial_data_file_index: int = None
+
+    auto_load_next_file: bool = False
 
     pf_config_file_path: str = None
     map_data_path: str = None

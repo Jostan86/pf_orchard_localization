@@ -66,68 +66,68 @@ class Live(QThread):
         particle filter state. Can be stopped by calling stop_pf().
         """
                         
-            self.pf_active = True
+        self.pf_active = True
+        
+        # As long as the thread is active, keep processing the data
+        while self.pf_active:
             
-            # As long as the thread is active, keep processing the data
-            while self.pf_active:
-                
-                # Wait for odom data
-                self.odom_mutex.lock()
-                if len(self.odom_data_list) == 0:
-                    self.odom_wait_condition.wait(self.odom_mutex)
-                if not self.pf_active:
-                    self.odom_mutex.unlock()
-                    break
-                odom_data = self.odom_data_list.pop(0)
+            # Wait for odom data
+            self.odom_mutex.lock()
+            if len(self.odom_data_list) == 0:
+                self.odom_wait_condition.wait(self.odom_mutex)
+            if not self.pf_active:
                 self.odom_mutex.unlock()
-                
-                # Wait for trunk data
+                break
+            odom_data = self.odom_data_list.pop(0)
+            self.odom_mutex.unlock()
+            
+            # Wait for trunk data
+            self.tree_image_data_mutex.lock()
+            if len(self.tree_image_data_queue) == 0:
+                self.tree_image_data_condition.wait(self.tree_image_data_mutex)
+            if not self.pf_active:
+                self.tree_image_data_mutex.unlock()
+                break
+            tree_image_data = self.tree_image_data_queue.pop(0)
+            self.tree_image_data_mutex.unlock()
+            
+            # TODO check if the odom or trunk data is None and act accordingly
+            
+            # TODO I'm not sure this queue size is working right
+            self.set_queue_size.emit(len(self.tree_image_data_queue))
+            
+            # Check if the timestamps are the same, they should be since they are from the same image
+            timestamp_odom = odom_data["timestamp"]
+            timestamp_tree_data = tree_image_data["timestamp"]
+            timestamp_diff = timestamp_odom - timestamp_tree_data
+            
+            # Odom is newer, so ignore the trunk data and put the odom data back in the queue
+            if timestamp_diff > 0.0001:
+                self.odom_mutex.lock()
+                self.odom_data_list.insert(0, odom_data)
+                self.odom_mutex.unlock()
+            
+            # Trunk data is newer, so handle the odom data and put the trunk data back in the queue
+            elif timestamp_diff < -0.0001:
+                self.handle_odom_data(odom_data)
                 self.tree_image_data_mutex.lock()
-                if len(self.tree_image_data_queue) == 0:
-                    self.tree_image_data_condition.wait(self.tree_image_data_mutex)
-                if not self.pf_active:
-                    self.tree_image_data_mutex.unlock()
-                    break
-                tree_image_data = self.tree_image_data_queue.pop(0)
+                self.tree_image_data_queue.insert(0, tree_image_data)
                 self.tree_image_data_mutex.unlock()
                 
-                # TODO check if the odom or trunk data is None and act accordingly
+            # The timestamps are the same so we can process the data
+            else:
+                seg_img = tree_image_data["seg_img"]
                 
-                # TODO I'm not sure this queue size is working right
-                self.set_queue_size.emit(len(self.tree_image_data_queue))
+                self.signal_segmented_image.emit(seg_img, self.segmented_image_display_num)
                 
-                # Check if the timestamps are the same, they should be since they are from the same image
-                timestamp_odom = odom_data["timestamp"]
-                timestamp_tree_data = tree_image_data["timestamp"]
-                timestamp_diff = timestamp_odom - timestamp_tree_data
+                self.handle_odom_data(odom_data)
+                self.handle_tree_image_data(tree_image_data)
                 
-                # Odom is newer, so ignore the trunk data and put the odom data back in the queue
-                if timestamp_diff > 0.0001:
-                    self.odom_mutex.lock()
-                    self.odom_data_list.insert(0, odom_data)
-                    self.odom_mutex.unlock()
-                
-                # Trunk data is newer, so handle the odom data and put the trunk data back in the queue
-                elif timestamp_diff < -0.0001:
-                    self.handle_odom_data(odom_data)
-                    self.tree_image_data_mutex.lock()
-                    self.tree_image_data_queue.insert(0, tree_image_data)
-                    self.tree_image_data_mutex.unlock()
-                    
-                # The timestamps are the same so we can process the data
-                else:
-                    seg_img = tree_image_data["seg_img"]
-                    
-                    self.signal_segmented_image.emit(seg_img, self.segmented_image_display_num)
-                    
-                    self.handle_odom_data(odom_data)
-                    self.handle_tree_image_data(tree_image_data)
-                    
-                    self.plot_best_guess.emit(self.pf_engine.best_particle)
-                    self.plot_particles.emit(self.pf_engine.downsample_particles())
-                
-                
-                self.converged_signal.emit(self.pf_engine.check_convergence())
+                self.plot_best_guess.emit(self.pf_engine.best_particle)
+                self.plot_particles.emit(self.pf_engine.downsample_particles())
+            
+            
+            self.converged_signal.emit(self.pf_engine.check_convergence())
                 
     
     def handle_odom_data(self, odom_data: dict) -> None:

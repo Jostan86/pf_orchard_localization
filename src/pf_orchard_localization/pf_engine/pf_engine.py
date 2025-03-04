@@ -9,6 +9,9 @@ from pf_orchard_localization.utils import ParametersPf
 # from pf_orchard_localization.recorded_data_loaders import MessageType, Timestamp, ImageData, OdomData, ImuData, Gnss, PoseEstimate
 from pf_orchard_localization.data_managers import data_msgs
 
+import logging
+logger = logging.getLogger(__name__)
+
 class PfEngine:
 
     def __init__(self, map_data: MapData, random_seed=None) -> None:
@@ -224,6 +227,9 @@ class PfEngine:
         num_particles = self.particles.shape[0]
 
         # This is needed to make the noise independent of the time step size
+        if dt_odom <= 0:
+            logger.warning("dt_odom is less than or equal to 0, skipping motion update")
+            return
         noise_multiplier = 1 / np.sqrt(dt_odom * self.noise_fps)
 
         # Make array of noise to add to the control/odometry velocities
@@ -275,9 +281,6 @@ class PfEngine:
             orientation_current_time = imu_msg.msg_timestamp.to_sec()
             delta_time = orientation_current_time - self.orientation_prev_time
 
-            # print(f"Delta time: {delta_time}")
-            # print(f"current time: {orientation_current_time}")
-            # print(f"Delta yaw: {delta_yaw}")
             angular_velocity = delta_yaw / delta_time
 
             self.gyro_readings[self.gyro_readings_idx] = angular_velocity
@@ -371,21 +374,6 @@ class PfEngine:
 
         # Initialize the new particles array
         new_particles = np.zeros((num_particles, 3))
-
-
-
-        # # Set a starting position for the resampling
-        # cur_weight = self.particle_weights[0]
-        # idx_w = 0
-
-        # # TODO: i think this can be a numpy operation
-        # # Use the low variance sampling algorithm to resample the particles
-        # for idx_m in range(num_particles):
-        #     U = step_size + idx_m / num_particles
-        #     while U > cur_weight:
-        #         idx_w += 1
-        #         cur_weight += self.particle_weights[idx_w]
-        #     new_particles[idx_m, :] = self.particles[idx_w, :]
 
         # Cumulative sum of weights
         cumulative_weights = np.cumsum(self.particle_weights)

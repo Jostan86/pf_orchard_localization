@@ -51,13 +51,14 @@ noise_fps: 50
 include_width: true
 
 # Set to true to use the change in the orientation output from the imu to override any other the angular velocity
-use_orientation_for_angular_velocity: True
+use_orientation_for_angular_velocity: False
 # The number of readings to average to get the angular velocity
 num_readings_for_angular_velocity: 5
 # Set to true to use the global orientation output from the imu to help calculate the particle weights.
 # If true, the orientation offset between the map and the sensor needs to be provided and accurate.
-use_orientation_for_particle_weights: True
+use_orientation_for_particle_weights: False
 # The orientation offset between the map and the sensor, i.e. the orientation output's 'north' isn't aligned with the map's 'north', so this is the offset between them.
+# This is specific to the orientation sensor used and needs to be tuned for each sensor - or an automatic process implemented.
 orientation_offset: 1.02  # radians
 # Option to help determine the offset, prints the offset between the imu orientation and the best particles orientation
 # use_orientation_for_particle_weights should be set to false when using this option

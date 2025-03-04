@@ -5,7 +5,7 @@
     // "../../docker/docker-compose-desktop-ros-pf-app.yml" 
   ],
   "service": "pf_orchard_localization",
-  "workspaceFolder": "/home/vscode/pf_orchard_localization",
+  "workspaceFolder": "/home/vscode/my_python_packages/pf_orchard_localization",
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/vscode/.bash_history,type=bind"
   ],
